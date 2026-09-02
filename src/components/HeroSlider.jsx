@@ -25,7 +25,7 @@ const SWARNA_SLIDES = [
     title: 'Bespoke Kundan & Emerald Heirlooms',
     description: 'Handcrafted 22K gold Jadau foil setting featuring glowing Zambian emerald droplets and un-cut Polki creations.',
     mainImage: '/assets/jewellery/hero/main2.jpg',
-    ringAccent: '/assets/jewellery/ring/herosection2.png',
+    ringAccent: '/assets/jewellery/hero/ringhero2.png',
     accentImage: '/assets/jewellery/bracelet/1.jpg',
     thumbnails: [
       '/assets/jewellery/hero/sub2-1.jpg',
@@ -41,7 +41,7 @@ const SWARNA_SLIDES = [
     title: 'EF VVS Certified Diamond Creations',
     description: 'Internationally authenticated GIA solitaires and platinum-set high jewellery tailored for royal moments.',
     mainImage: '/assets/jewellery/hero/main3.jpg',
-    ringAccent: '/assets/jewellery/ring/herosection3.png',
+    ringAccent: '/assets/jewellery/hero/ringhero3.png',
     accentImage: '/assets/jewellery/hero/rightside3.jpg',
     thumbnails: [
       '/assets/jewellery/hero/sub3-1.jpg',

@@ -5,21 +5,22 @@ const VIDEO_CATEGORIES = [
     id: 'earrings',
     title: 'Earrings',
     itemCount: '80+ items',
-    video: '/assets/jewellery/video/From Klickpin.com- Elegant entryway organization ideas that are perfect when you want something stylish modern and easy to copy for anyone who lov.mp4',
+    video: '/assets/jewellery/video/From Klickpin.com- Money Saving Tips Inspiration for Everyday 18207-pin-id-982136631248328968.mp4',
+
     description: 'Handcrafted Kundan droplets and diamond chandelier earrings tailored for royal moments.'
   },
   {
     id: 'rings',
     title: 'Rings',
     itemCount: '120+ items',
-    video: '/assets/jewellery/video/From Klickpin.com- Money Saving Tips Inspiration for Everyday 18207-pin-id-982136631248328968.mp4',
+    video: '/assets/jewellery/video/From Klickpin.com- Elegant entryway organization ideas that are perfect when you want something stylish modern and easy to copy for anyone who lov.mp4',
     description: 'Bespoke 22K gold Jadau foil setting and GIA certified solitaire creations reflecting your unique story.'
   },
   {
     id: 'bracelets',
     title: 'Bracelets',
     itemCount: '60+ items',
-    video: '/assets/jewellery/video/From Klickpin.com- Smart garage upgrades for boards that feel current and useful for cozy moods to try this week-pin-id-1082130616745941230.mp4',
+    video: '/assets/jewellery/video/From Klickpin.com- From beginner to obsessed Build these beautiful goal setting ideas that help you get the look without the stress with smart ste.mp4',
     description: 'Torquent Natoque Per Cursus Dui Condimentum Nec Vestibulum Tortor. Pulvinar Euismod Ad Diam Molestie Consectetur Parturient Omare. Id Nibh Sit Euismod Volutpat Ligula Tristique.'
   },
   {
@@ -157,7 +158,7 @@ export function JewelleryVideoAccordionSection({ onSelectCategory, onNavigateSho
                           letterSpacing: '0.04em'
                         }}
                       >
-                        * {cat.title} *
+                        {cat.title}
                       </h3>
                     </div>
 
