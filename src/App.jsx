@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomeSection } from './components/HomeSection';
@@ -96,6 +96,17 @@ export default function App() {
 
   const effectiveUserId = currentUser ? currentUser.id || currentUser._id || 'buyer-1' : 'buyer-guest';
 
+  const isCartLoaded = useRef(false);
+  const isWishlistLoaded = useRef(false);
+  const skipCartSync = useRef(false);
+  const skipWishlistSync = useRef(false);
+
+  // Reset loaded flags when effectiveUserId changes
+  useEffect(() => {
+    isCartLoaded.current = false;
+    isWishlistLoaded.current = false;
+  }, [effectiveUserId]);
+
   // Load user's Cart and Wishlist from MongoDB on load or user change
   useEffect(() => {
     let isMounted = true;
@@ -116,8 +127,10 @@ export default function App() {
               sellerName: i.sellerName,
               quantity: i.qty || 1
             }));
+            skipCartSync.current = true;
             setCartItems(mappedCart);
           } else {
+            skipCartSync.current = true;
             setCartItems([]);
           }
 
@@ -129,10 +142,15 @@ export default function App() {
               image: i.image,
               sellerName: i.sellerName
             }));
+            skipWishlistSync.current = true;
             setWishlistItems(mappedWish);
           } else {
+            skipWishlistSync.current = true;
             setWishlistItems([]);
           }
+
+          isCartLoaded.current = true;
+          isWishlistLoaded.current = true;
         }
       } catch (e) {
         console.warn('Cart & Wishlist MongoDB API load fallback:', e);
@@ -144,8 +162,13 @@ export default function App() {
     };
   }, [effectiveUserId]);
 
-  // Sync Cart with MongoDB whenever cartItems changes
+  // Sync Cart with MongoDB whenever cartItems changes after initial load
   useEffect(() => {
+    if (!isCartLoaded.current) return;
+    if (skipCartSync.current) {
+      skipCartSync.current = false;
+      return;
+    }
     const formattedItems = cartItems.map((item) => ({
       productId: item.id || 'prod-1',
       name: item.name || 'Jewellery Item',
@@ -159,8 +182,13 @@ export default function App() {
     });
   }, [cartItems, effectiveUserId]);
 
-  // Sync Wishlist with MongoDB whenever wishlistItems changes
+  // Sync Wishlist with MongoDB whenever wishlistItems changes after initial load
   useEffect(() => {
+    if (!isWishlistLoaded.current) return;
+    if (skipWishlistSync.current) {
+      skipWishlistSync.current = false;
+      return;
+    }
     const formattedItems = wishlistItems.map((item) => ({
       productId: item.id || 'prod-1',
       name: item.name || 'Jewellery Item',
