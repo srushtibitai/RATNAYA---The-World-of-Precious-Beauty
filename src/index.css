@@ -4,6 +4,8 @@
 
 /* RATNAYA — Luxury Jewellery Marketplace Design System */
 :root {
+  color-scheme: only light;
+  supported-color-schemes: only light;
   --bg-primary: #FAF6F0;
   --bg-secondary: #FDFBF7;
   --bg-tertiary: #F5E7D6;
@@ -52,6 +54,7 @@
 html {
   scroll-behavior: smooth;
   font-size: 16px;
+  color-scheme: only light !important;
 }
 
 body {
@@ -62,6 +65,7 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: only light !important;
 }
 
 /* Custom Scrollbar */
