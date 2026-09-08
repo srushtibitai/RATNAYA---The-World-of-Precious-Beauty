@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Lock, CheckCircle2, ArrowRight, CreditCard, Smartphone, Building, Wallet, Truck } from 'lucide-react';
+import { ShieldCheck, Lock, CheckCircle2, ArrowRight, CreditCard, Smartphone, Building, Wallet, Truck, Loader2 } from 'lucide-react';
+import { api } from '../services/api';
 
 export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
   const [step, setStep] = useState('checkout'); // 'checkout' or 'success'
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState(null);
   const [formData, setFormData] = useState({
     fullName: 'Priya Malhotra',
     email: 'priya.m@gmail.com',
@@ -18,70 +21,115 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
   const gst = Math.round(subtotal * 0.03);
   const total = subtotal + gst;
 
-  const handleSubmitOrder = (e) => {
+  const handleSubmitOrder = async (e) => {
     e.preventDefault();
-    setStep('success');
+    setIsProcessing(true);
+
+    try {
+      const keyRes = await api.getRazorpayKey();
+      const orderRes = await api.createRazorpayOrder(total, `receipt_ord_${Date.now()}`);
+
+      if (!orderRes || !orderRes.success || !orderRes.order) {
+        alert('Payment initialization failed. Please try again.');
+        setIsProcessing(false);
+        return;
+      }
+
+      const keyId = keyRes.keyId || 'rzp_test_RatnayaKey123';
+      const orderObj = orderRes.order;
+
+      if (window.Razorpay && orderRes.isRazorpayLive) {
+        const options = {
+          key: keyId,
+          amount: orderObj.amount,
+          currency: orderObj.currency || 'INR',
+          name: 'RATNAYA Luxury Marketplace',
+          description: 'Secure Payment Settlement to GPay linked Bank Account',
+          image: '/assets/logo.png',
+          order_id: orderObj.id,
+          prefill: {
+            name: formData.fullName,
+            email: formData.email,
+            contact: formData.phone
+          },
+          notes: {
+            address: `${formData.address}, ${formData.city}, ${formData.state} - ${formData.pincode}`
+          },
+          theme: {
+            color: '#C5A059'
+          },
+          handler: async function (response) {
+            await api.verifyRazorpayPayment(response);
+            setPaymentDetails({
+              paymentId: response.razorpay_payment_id || `pay_${Date.now()}`,
+              orderId: response.razorpay_order_id || orderObj.id,
+              signature: response.razorpay_signature
+            });
+            setIsProcessing(false);
+            setStep('success');
+          },
+          modal: {
+            ondismiss: function () {
+              setIsProcessing(false);
+            }
+          }
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+      } else {
+        setTimeout(() => {
+          setPaymentDetails({
+            paymentId: `pay_rzp_simulated_${Math.floor(100000 + Math.random() * 900000)}`,
+            orderId: orderObj.id,
+            settlementTarget: 'Google Pay Linked Bank Account'
+          });
+          setIsProcessing(false);
+          setStep('success');
+        }, 1200);
+      }
+    } catch (err) {
+      console.error('Razorpay process error:', err);
+      setIsProcessing(false);
+      alert('Error connecting to Razorpay payment gateway.');
+    }
   };
 
   if (step === 'success') {
     return (
-      <div style={{ backgroundColor: '#FAF6F0', padding: '100px 0', minHeight: '80vh', textAlign: 'center' }}>
-        <div className="container" style={{ maxWidth: '600px' }}>
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              padding: '48px 36px',
-              borderRadius: '4px',
-              border: '1px solid var(--color-border-gold)',
-              boxShadow: 'var(--shadow-medium)'
-            }}
-          >
-            <div
-              style={{
-                width: '72px',
-                height: '72px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(197, 160, 89, 0.12)',
-                border: '1px solid var(--color-gold)',
-                color: 'var(--color-gold-dark)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 20px'
-              }}
-            >
-              <CheckCircle2 size={40} />
+      <div className="bg-[#FAF6F0] py-16 sm:py-24 min-h-[80vh] flex items-center justify-center">
+        <div className="container mx-auto px-4 max-w-xl text-center">
+          <div className="bg-white p-8 sm:p-12 rounded-sm border border-gold/40 shadow-medium">
+            <div className="w-16 h-16 rounded-full bg-gold/15 border border-gold text-gold-dark flex items-center justify-center mx-auto mb-5">
+              <CheckCircle2 size={36} />
             </div>
 
             <span className="eyebrow">ORDER CONFIRMED</span>
-            <h1 style={{ fontSize: '2rem', fontFamily: "'Marcellus', serif", marginBottom: '12px' }}>
+            <h1 className="font-heading text-2xl sm:text-3xl mb-3 text-charcoal">
               Thank You For Your Royal Order
             </h1>
-            <p style={{ fontSize: '0.92rem', color: 'var(--color-text-muted)', marginBottom: '24px', lineHeight: 1.7 }}>
+            <p className="text-xs sm:text-sm text-gray-600 mb-6 leading-relaxed">
               Your order <strong>#RAT-ORD-{Math.floor(10000 + Math.random() * 90000)}</strong> has been successfully placed with our verified jeweller partners. An SMS and email confirmation have been sent to <strong>{formData.email}</strong>.
             </p>
 
-            <div
-              style={{
-                backgroundColor: '#FAF6F0',
-                padding: '20px',
-                borderRadius: '4px',
-                textAlign: 'left',
-                marginBottom: '28px',
-                fontSize: '0.86rem'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#777' }}>Total Amount Paid:</span>
-                <strong style={{ fontSize: '1.05rem', color: 'var(--color-charcoal)' }}>₹{total.toLocaleString('en-IN')}</strong>
+            <div className="bg-[#FAF6F0] p-4 sm:p-5 rounded-sm text-left mb-6 text-xs sm:text-sm space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Total Amount Paid:</span>
+                <strong className="text-charcoal font-semibold">₹{total.toLocaleString('en-IN')}</strong>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#777' }}>Payment Method:</span>
-                <span style={{ textTransform: 'uppercase', fontWeight: '500' }}>{formData.paymentMethod}</span>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Payment Gateway:</span>
+                <span className="font-semibold text-gold-dark">Razorpay (GPay / UPI / Cards)</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#777' }}>Delivery Address:</span>
-                <span style={{ fontWeight: '500' }}>{formData.city}, {formData.state}</span>
+              {paymentDetails && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Razorpay Payment ID:</span>
+                  <span className="font-mono font-semibold text-gold-dark">{paymentDetails.paymentId}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-gray-500">Settlement Destination:</span>
+                <span className="text-emerald-700 font-semibold">GPay Linked Bank Account</span>
               </div>
             </div>
 
@@ -90,8 +138,7 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
                 onOrderPlaced();
                 onNavigateShop();
               }}
-              className="btn-gold"
-              style={{ width: '100%', padding: '16px' }}
+              className="btn-gold w-full py-3.5 text-xs font-semibold flex items-center justify-center gap-2"
             >
               CONTINUE SHOPPING <ArrowRight size={16} />
             </button>
@@ -102,39 +149,25 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
   }
 
   return (
-    <div style={{ backgroundColor: '#FAF6F0', padding: '60px 0 100px', minHeight: '80vh' }}>
-      <div className="container">
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+    <div className="bg-[#FAF6F0] py-12 sm:py-16 min-h-[80vh]">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-8">
           <span className="eyebrow">SECURE CHECKOUT</span>
-          <h1 style={{ fontSize: '2.4rem', fontFamily: "'Marcellus', serif" }}>Complete Your Purchase</h1>
+          <h1 className="font-heading text-3xl sm:text-4xl text-charcoal">Complete Your Purchase</h1>
         </div>
 
         <form onSubmit={handleSubmitOrder}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1.2fr 0.8fr',
-              gap: '40px'
-            }}
-            className="checkout-grid"
-          >
+          <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-8">
             {/* LEFT FORM FIELDS */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+            <div className="flex flex-col gap-6">
               {/* Section 1: Customer Information */}
-              <div
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  padding: '28px',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '4px'
-                }}
-              >
-                <h3 style={{ fontSize: '1.2rem', marginBottom: '20px', fontFamily: "'Marcellus', serif" }}>
+              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm">
+                <h3 className="font-heading text-lg sm:text-xl mb-5">
                   1. Customer Information
                 </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#666', display: 'block', marginBottom: '6px' }}>
+                    <label className="text-xs uppercase font-semibold text-gray-500 mb-1.5 block">
                       Full Name
                     </label>
                     <input
@@ -146,7 +179,7 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#666', display: 'block', marginBottom: '6px' }}>
+                    <label className="text-xs uppercase font-semibold text-gray-500 mb-1.5 block">
                       Email Address
                     </label>
                     <input
@@ -157,8 +190,8 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
                       className="input-field"
                     />
                   </div>
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#666', display: 'block', marginBottom: '6px' }}>
+                  <div className="sm:col-span-2">
+                    <label className="text-xs uppercase font-semibold text-gray-500 mb-1.5 block">
                       Mobile Phone (for delivery SMS updates)
                     </label>
                     <input
@@ -173,20 +206,13 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
               </div>
 
               {/* Section 2: Shipping Address */}
-              <div
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  padding: '28px',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '4px'
-                }}
-              >
-                <h3 style={{ fontSize: '1.2rem', marginBottom: '20px', fontFamily: "'Marcellus', serif" }}>
+              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm">
+                <h3 className="font-heading text-lg sm:text-xl mb-5">
                   2. Delivery Address
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="flex flex-col gap-4">
                   <div>
-                    <label style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#666', display: 'block', marginBottom: '6px' }}>
+                    <label className="text-xs uppercase font-semibold text-gray-500 mb-1.5 block">
                       Street Address / Flat / Building
                     </label>
                     <input
@@ -197,9 +223,9 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
                       className="input-field"
                     />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#666', display: 'block', marginBottom: '6px' }}>
+                      <label className="text-xs uppercase font-semibold text-gray-500 mb-1.5 block">
                         City
                       </label>
                       <input
@@ -211,7 +237,7 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#666', display: 'block', marginBottom: '6px' }}>
+                      <label className="text-xs uppercase font-semibold text-gray-500 mb-1.5 block">
                         State
                       </label>
                       <input
@@ -223,7 +249,7 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#666', display: 'block', marginBottom: '6px' }}>
+                      <label className="text-xs uppercase font-semibold text-gray-500 mb-1.5 block">
                         PIN Code
                       </label>
                       <input
@@ -239,19 +265,12 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
               </div>
 
               {/* Section 3: Payment Options */}
-              <div
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  padding: '28px',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '4px'
-                }}
-              >
-                <h3 style={{ fontSize: '1.2rem', marginBottom: '20px', fontFamily: "'Marcellus', serif" }}>
+              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm">
+                <h3 className="font-heading text-lg sm:text-xl mb-5">
                   3. Payment Method
                 </h3>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="flex flex-col gap-3">
                   {[
                     { id: 'upi', name: 'UPI (GPay / PhonePe / Paytm / BHIM)', icon: <Smartphone size={18} /> },
                     { id: 'card', name: 'Credit / Debit Card (Visa, Mastercard, RuPay)', icon: <CreditCard size={18} /> },
@@ -260,25 +279,21 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
                   ].map((method) => (
                     <label
                       key={method.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '14px',
-                        padding: '16px',
-                        border: formData.paymentMethod === method.id ? '2px solid var(--color-gold)' : '1px solid var(--color-border)',
-                        backgroundColor: formData.paymentMethod === method.id ? 'var(--bg-primary)' : '#FFFFFF',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
+                      className={`flex items-center gap-3.5 p-4 border rounded-sm cursor-pointer transition-all ${
+                        formData.paymentMethod === method.id
+                          ? 'border-gold bg-[#FAF6F0]'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
                     >
                       <input
                         type="radio"
                         name="pm"
                         checked={formData.paymentMethod === method.id}
                         onChange={() => setFormData({ ...formData, paymentMethod: method.id })}
+                        className="accent-gold"
                       />
-                      <span style={{ color: 'var(--color-gold-dark)' }}>{method.icon}</span>
-                      <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{method.name}</span>
+                      <span className="text-gold-dark">{method.icon}</span>
+                      <span className="text-xs sm:text-sm font-medium text-charcoal">{method.name}</span>
                     </label>
                   ))}
                 </div>
@@ -287,64 +302,44 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
 
             {/* RIGHT ORDER SUMMARY */}
             <div>
-              <div
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  padding: '28px',
-                  border: '1px solid var(--color-border-gold)',
-                  borderRadius: '4px',
-                  position: 'sticky',
-                  top: '100px'
-                }}
-              >
-                <h3 style={{ fontSize: '1.2rem', marginBottom: '20px', fontFamily: "'Marcellus', serif", borderBottom: '1px solid var(--color-border)', paddingBottom: '12px' }}>
+              <div className="bg-white p-6 sm:p-8 border border-gold/40 rounded-sm shadow-sm sticky top-28">
+                <h3 className="font-heading text-lg sm:text-xl pb-3 border-b border-gray-200 mb-5">
                   Order Summary
                 </h3>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px', maxHeight: '300px', overflowY: 'auto' }}>
+                <div className="flex flex-col gap-3.5 mb-5 max-h-72 overflow-y-auto">
                   {cartItems.map((item) => (
-                    <div key={item.id} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <div key={item.id} className="flex gap-3 items-center">
                       <img
                         src={item.image || item.images?.[0]}
                         alt={item.name}
-                        style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '2px' }}
+                        className="w-14 h-14 object-cover rounded-sm border border-gray-100 shrink-0"
                       />
-                      <div style={{ flex: 1 }}>
-                        <h5 style={{ fontSize: '0.85rem', fontWeight: '500', lineHeight: 1.2 }}>{item.name}</h5>
-                        <span style={{ fontSize: '0.74rem', color: '#777' }}>Qty: {item.quantity} • Sold by {item.sellerName}</span>
+                      <div className="flex-1 min-w-0">
+                        <h5 className="text-xs font-medium line-clamp-1">{item.name}</h5>
+                        <span className="text-[0.7rem] text-gray-500">Qty: {item.quantity} • Sold by {item.sellerName}</span>
                       </div>
-                      <div style={{ fontSize: '0.88rem', fontWeight: '600' }}>
+                      <div className="text-xs font-semibold text-charcoal">
                         ₹{(item.price * item.quantity).toLocaleString('en-IN')}
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '16px', borderTop: '1px solid var(--color-border)', fontSize: '0.88rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666' }}>
+                <div className="flex flex-col gap-2 pt-4 border-t border-gray-200 text-xs sm:text-sm">
+                  <div className="flex justify-between text-gray-600">
                     <span>Items Subtotal</span>
                     <span>₹{subtotal.toLocaleString('en-IN')}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666' }}>
+                  <div className="flex justify-between text-gray-600">
                     <span>3% GST Tax</span>
                     <span>₹{gst.toLocaleString('en-IN')}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#137333' }}>
+                  <div className="flex justify-between text-emerald-700 font-medium">
                     <span>Insured Transit Shipping</span>
                     <span>FREE</span>
                   </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontSize: '1.25rem',
-                      fontWeight: '600',
-                      color: 'var(--color-charcoal)',
-                      paddingTop: '12px',
-                      borderTop: '1px dashed var(--color-border)',
-                      fontFamily: "'Marcellus', serif"
-                    }}
-                  >
+                  <div className="flex justify-between text-base font-bold text-charcoal pt-3 border-t border-dashed border-gray-200 font-heading">
                     <span>Grand Total</span>
                     <span>₹{total.toLocaleString('en-IN')}</span>
                   </div>
@@ -352,26 +347,28 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
 
                 <button
                   type="submit"
-                  className="btn-gold"
-                  style={{ width: '100%', marginTop: '24px', padding: '16px' }}
+                  disabled={isProcessing}
+                  className="btn-gold w-full mt-6 py-3.5 text-xs font-semibold flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed"
                 >
-                  <Lock size={16} /> PLACE ORDER (₹{total.toLocaleString('en-IN')})
+                  {isProcessing ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" /> INITIALIZING RAZORPAY...
+                    </>
+                  ) : (
+                    <>
+                      <Lock size={16} /> PAY WITH RAZORPAY / GPAY (₹{total.toLocaleString('en-IN')})
+                    </>
+                  )}
                 </button>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.72rem', color: '#777', marginTop: '16px', textAlign: 'center' }}>
-                  <ShieldCheck size={14} color="var(--color-gold)" /> Guaranteed Safe Checkout with 256-Bit SSL Encryption
+                <div className="flex items-center justify-center gap-1.5 text-[0.7rem] text-gray-500 mt-4 text-center">
+                  <ShieldCheck size={14} className="text-gold" /> Guaranteed Safe Checkout with 256-Bit SSL
                 </div>
               </div>
             </div>
           </div>
         </form>
       </div>
-
-      <style>{`
-        @media (max-width: 992px) {
-          .checkout-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
     </div>
   );
 }

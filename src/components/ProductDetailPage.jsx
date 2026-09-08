@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { SELLERS, PRODUCTS } from '../data/marketplaceData';
+import ImageModal from './ImageModal';
 import {
   Star,
   Heart,
@@ -13,7 +14,9 @@ import {
   ChevronRight,
   Plus,
   Minus,
-  Share2
+  Share2,
+  Loader2,
+  ZoomIn
 } from 'lucide-react';
 
 export function ProductDetailPage({
@@ -31,8 +34,9 @@ export function ProductDetailPage({
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('description');
   const [addedToast, setAddedToast] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
-  const images = product.images || [product.image];
+  const images = product.images && product.images.length > 0 ? product.images : [product.image];
   const seller = SELLERS.find((s) => s.id === product.sellerId) || {
     name: product.sellerName,
     city: 'Jaipur, Rajasthan',
@@ -44,114 +48,65 @@ export function ProductDetailPage({
     (p) => p.category === product.category && p.id !== product.id
   ).slice(0, 4);
 
-  const handleAddToCart = () => {
+  const [addingCart, setAddingCart] = useState(false);
+
+  const handleAddToCart = async () => {
+    setAddingCart(true);
+    await new Promise((res) => setTimeout(res, 300));
     onAddToCart({ ...product, quantity });
+    setAddingCart(false);
     setAddedToast(true);
     setTimeout(() => setAddedToast(false), 3000);
   };
 
   return (
-    <div style={{ backgroundColor: '#FAF6F0', paddingBottom: '100px' }}>
+    <div className="bg-[#FAF6F0] pb-24 min-h-[80vh]">
       {/* Toast Notification */}
       {addedToast && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            right: '24px',
-            backgroundColor: '#111111',
-            color: '#FFFFFF',
-            padding: '16px 24px',
-            borderRadius: '4px',
-            boxShadow: 'var(--shadow-medium)',
-            zIndex: 300,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            border: '1px solid var(--color-gold)'
-          }}
-        >
-          <CheckCircle2 color="var(--color-gold)" size={20} />
+        <div className="fixed bottom-6 right-6 bg-charcoal text-white p-4 rounded-md shadow-2xl z-50 flex items-center gap-3 border border-gold animate-fadeIn">
+          <CheckCircle2 className="text-gold" size={20} />
           <div>
-            <strong style={{ display: 'block', fontSize: '0.9rem' }}>Added to Shopping Bag</strong>
-            <span style={{ fontSize: '0.78rem', color: '#CCC' }}>{product.name} ({quantity} qty)</span>
+            <strong className="block text-sm">Added to Shopping Bag</strong>
+            <span className="text-xs text-gray-300">{product.name} ({quantity} qty)</span>
           </div>
         </div>
       )}
 
       {/* Breadcrumb */}
-      <div
-        style={{
-          backgroundColor: '#FFFFFF',
-          borderBottom: '1px solid var(--color-border)',
-          padding: '14px 0'
-        }}
-      >
-        <div className="container">
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '0.8rem',
-              color: 'var(--color-text-muted)'
-            }}
-          >
+      <div className="bg-white border-b border-gray-200 py-3">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 flex-wrap">
             <span>Home</span> <ChevronRight size={12} />
             <span>Shop</span> <ChevronRight size={12} />
             <span>{product.categoryName}</span> <ChevronRight size={12} />
-            <span style={{ color: 'var(--color-charcoal)', fontWeight: '500' }}>{product.name}</span>
+            <span className="text-charcoal font-medium truncate max-w-[200px] sm:max-w-none">{product.name}</span>
           </div>
         </div>
       </div>
 
-      <div className="container" style={{ paddingTop: '40px' }}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1.1fr 0.9fr',
-            gap: '50px',
-            backgroundColor: '#FFFFFF',
-            padding: '36px',
-            border: '1px solid var(--color-border)',
-            borderRadius: '4px',
-            boxShadow: 'var(--shadow-subtle)'
-          }}
-          className="pdp-main-grid"
-        >
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8 lg:gap-12 bg-white p-6 sm:p-10 border border-gray-200 rounded-sm shadow-subtle">
           {/* LEFT: GALLERY */}
           <div>
             <div
-              style={{
-                aspectRatio: '1/1',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                backgroundColor: '#FAF8F5',
-                position: 'relative',
-                marginBottom: '16px',
-                border: '1px solid var(--color-border)'
-              }}
+              className="relative aspect-square rounded-sm overflow-hidden bg-[#FAF8F5] mb-4 border border-gray-200 group cursor-pointer"
+              onClick={() => setIsImageModalOpen(true)}
+              title="Click for fullscreen view (Esc to close)"
             >
               <img
                 src={images[selectedImageIdx]}
                 alt={product.name}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
 
+              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
+                <span className="bg-black/75 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 font-medium shadow-lg backdrop-blur-sm">
+                  <ZoomIn size={16} /> Click to Enlarge
+                </span>
+              </div>
+
               {product.discountPercent > 0 && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: '16px',
-                    left: '16px',
-                    backgroundColor: 'var(--color-gold)',
-                    color: '#FFFFFF',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    padding: '4px 12px',
-                    letterSpacing: '0.1em'
-                  }}
-                >
+                <span className="absolute top-4 left-4 bg-gold text-white text-xs font-bold px-3 py-1 tracking-wider">
                   {product.discountPercent}% OFF
                 </span>
               )}
@@ -159,23 +114,17 @@ export function ProductDetailPage({
 
             {/* Thumbnail Gallery Row */}
             {images.length > 1 && (
-              <div style={{ display: 'flex', gap: '12px' }}>
+              <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
                 {images.map((img, idx) => (
-                  <div
+                  <button
                     key={idx}
                     onClick={() => setSelectedImageIdx(idx)}
-                    style={{
-                      width: '80px',
-                      height: '80px',
-                      borderRadius: '2px',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      border: selectedImageIdx === idx ? '2px solid var(--color-gold)' : '1px solid var(--color-border)',
-                      opacity: selectedImageIdx === idx ? 1 : 0.6
-                    }}
+                    className={`w-16 h-16 sm:w-20 sm:h-20 rounded-sm overflow-hidden flex-shrink-0 cursor-pointer border p-0 transition-all ${
+                      selectedImageIdx === idx ? 'border-gold ring-2 ring-gold/30' : 'border-gray-200 opacity-60 hover:opacity-100'
+                    }`}
                   >
-                    <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </div>
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                  </button>
                 ))}
               </div>
             )}
@@ -183,126 +132,68 @@ export function ProductDetailPage({
 
           {/* RIGHT: DETAILS */}
           <div>
-            {/* Seller Badge */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '12px'
-              }}
-            >
-              <span className="eyebrow" style={{ marginBottom: 0 }}>
-                SKU: {product.sku}
-              </span>
-              <span
-                style={{
-                  fontSize: '0.78rem',
-                  color: '#137333',
-                  backgroundColor: '#E6F4EA',
-                  padding: '3px 10px',
-                  borderRadius: '12px',
-                  fontWeight: '600'
-                }}
-              >
-                In Stock ({product.stock} pieces remaining)
+            {/* SKU & Stock Badge */}
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <span className="eyebrow mb-0">SKU: {product.sku}</span>
+              <span className="text-xs text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full font-semibold">
+                In Stock ({product.stock} left)
               </span>
             </div>
 
-            <h1 style={{ fontSize: '2.1rem', marginBottom: '12px', lineHeight: 1.25 }}>
+            <h1 className="font-heading text-2xl sm:text-3xl text-charcoal mb-3 leading-snug">
               {product.name}
             </h1>
 
             {/* Rating */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', color: '#D4AF37' }}>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex text-amber-500">
                 {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={16} fill={i < Math.floor(product.rating) ? '#D4AF37' : 'none'} stroke="#D4AF37" />
+                  <Star key={i} size={16} fill={i < Math.floor(product.rating) ? 'currentColor' : 'none'} stroke="currentColor" />
                 ))}
               </div>
-              <span style={{ fontSize: '0.86rem', color: 'var(--color-text-muted)' }}>
+              <span className="text-xs sm:text-sm text-gray-500">
                 {product.rating} ({product.reviewsCount} customer reviews)
               </span>
             </div>
 
             {/* Pricing */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'baseline',
-                gap: '16px',
-                paddingBottom: '20px',
-                borderBottom: '1px solid var(--color-border)',
-                marginBottom: '24px'
-              }}
-            >
-              <span
-                style={{
-                  fontSize: '2.2rem',
-                  fontWeight: '600',
-                  color: 'var(--color-charcoal)',
-                  fontFamily: "'Marcellus', serif"
-                }}
-              >
+            <div className="flex items-baseline flex-wrap gap-3 pb-5 border-b border-gray-200 mb-6">
+              <span className="font-heading text-3xl sm:text-4xl font-semibold text-charcoal">
                 ₹{product.price.toLocaleString('en-IN')}
               </span>
               {product.originalPrice && (
-                <span style={{ textDecoration: 'line-through', color: '#999', fontSize: '1.1rem' }}>
+                <span className="line-through text-gray-400 text-lg">
                   ₹{product.originalPrice.toLocaleString('en-IN')}
                 </span>
               )}
-              <span style={{ fontSize: '0.78rem', color: 'var(--color-gold-dark)', fontWeight: '600' }}>
-                (Inclusive of 3% GST & Insured Shipping)
+              <span className="text-xs text-gold-dark font-semibold w-full sm:w-auto">
+                (Inclusive of GST & Insured Shipping)
               </span>
             </div>
 
             {/* Seller Information Card */}
-            <div
-              style={{
-                backgroundColor: 'var(--bg-primary)',
-                border: '1px solid var(--color-border-gold)',
-                padding: '16px 20px',
-                borderRadius: '4px',
-                marginBottom: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Store size={22} color="var(--color-gold-dark)" />
+            <div className="bg-[#FAF6F0] border border-gold/30 p-4 rounded-sm mb-6 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Store size={22} className="text-gold-dark shrink-0" />
                 <div>
-                  <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-brown-muted)', letterSpacing: '0.08em' }}>
+                  <div className="text-[0.68rem] uppercase text-brownMuted tracking-wider font-semibold">
                     Authentic Merchant
                   </div>
-                  <div style={{ fontSize: '0.96rem', fontWeight: '600', color: 'var(--color-charcoal)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {product.sellerName} <ShieldCheck size={14} color="var(--color-gold)" />
+                  <div className="text-sm font-semibold text-charcoal flex items-center gap-1.5">
+                    {product.sellerName} <ShieldCheck size={14} className="text-gold" />
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => onViewSellerStore(product.sellerId)}
-                className="btn-outline-gold"
-                style={{ padding: '6px 14px', fontSize: '0.72rem' }}
+                className="btn-outline-gold py-1.5 px-3 text-xs whitespace-nowrap"
               >
                 View Store
               </button>
             </div>
 
             {/* Product Specifications Summary */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '12px',
-                backgroundColor: '#FFFFFF',
-                padding: '16px',
-                border: '1px solid var(--color-border)',
-                borderRadius: '4px',
-                marginBottom: '28px',
-                fontSize: '0.84rem'
-              }}
-            >
+            <div className="grid grid-cols-2 gap-3 bg-white p-4 border border-gray-200 rounded-sm mb-6 text-xs sm:text-sm">
               <div><strong>Metal Type:</strong> {product.metal}</div>
               <div><strong>Purity:</strong> {product.purity}</div>
               <div><strong>Gross Weight:</strong> {product.weight}</div>
@@ -312,31 +203,21 @@ export function ProductDetailPage({
             </div>
 
             {/* Quantity Selector */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '28px' }}>
-              <span style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '500' }}>
+            <div className="flex items-center gap-4 mb-6">
+              <span className="text-xs uppercase tracking-wider font-semibold text-charcoal">
                 Quantity:
               </span>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '2px',
-                  backgroundColor: '#FFFFFF'
-                }}
-              >
+              <div className="flex items-center border border-gray-300 rounded-sm bg-white">
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  style={{ padding: '8px 14px', color: 'var(--color-charcoal)' }}
+                  className="px-3 py-2 text-charcoal hover:bg-gray-100 border-none bg-transparent cursor-pointer"
                 >
                   <Minus size={14} />
                 </button>
-                <span style={{ padding: '0 16px', fontSize: '0.95rem', fontWeight: '600' }}>
-                  {quantity}
-                </span>
+                <span className="px-4 text-sm font-semibold">{quantity}</span>
                 <button
                   onClick={() => setQuantity(quantity + 1)}
-                  style={{ padding: '8px 14px', color: 'var(--color-charcoal)' }}
+                  className="px-3 py-2 text-charcoal hover:bg-gray-100 border-none bg-transparent cursor-pointer"
                 >
                   <Plus size={14} />
                 </button>
@@ -344,13 +225,21 @@ export function ProductDetailPage({
             </div>
 
             {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '14px', marginBottom: '24px' }}>
+            <div className="flex flex-col sm:flex-row gap-3 mb-6">
               <button
+                disabled={addingCart}
                 onClick={handleAddToCart}
-                className="btn-gold"
-                style={{ flex: 1, padding: '16px' }}
+                className="btn-gold flex-1 py-3.5 text-xs font-semibold flex items-center justify-center gap-2 disabled:opacity-80"
               >
-                <ShoppingBag size={18} /> ADD TO CART
+                {addingCart ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin text-white" /> ADDING...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag size={18} /> ADD TO CART
+                  </>
+                )}
               </button>
 
               <button
@@ -358,54 +247,39 @@ export function ProductDetailPage({
                   onAddToCart({ ...product, quantity });
                   onCheckoutDirect();
                 }}
-                className="btn-dark"
-                style={{ flex: 1, padding: '16px' }}
+                className="btn-dark flex-1 py-3.5 text-xs font-semibold"
               >
                 BUY NOW
               </button>
 
               <button
                 onClick={() => onToggleWishlist(product)}
-                style={{
-                  width: '52px',
-                  height: '52px',
-                  border: '1px solid var(--color-border)',
-                  backgroundColor: isWishlisted ? '#FCE8E6' : '#FFFFFF',
-                  borderRadius: '2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: isWishlisted ? '#D93838' : 'var(--color-charcoal)'
-                }}
+                className={`w-12 h-12 border border-gray-300 rounded-sm flex items-center justify-center transition-colors cursor-pointer self-center sm:self-auto shrink-0 ${
+                  isWishlisted ? 'bg-red-50 text-red-600 border-red-200' : 'bg-white text-charcoal hover:text-red-500'
+                }`}
                 title="Wishlist"
               >
-                <Heart size={22} fill={isWishlisted ? '#D93838' : 'none'} color={isWishlisted ? '#D93838' : '#111'} />
+                <Heart
+                  size={20}
+                  fill={isWishlisted ? '#D93838' : 'none'}
+                  stroke={isWishlisted ? '#D93838' : 'currentColor'}
+                  strokeWidth={isWishlisted ? 0 : 1.75}
+                />
               </button>
             </div>
 
             {/* Authenticity Info Cards */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '12px',
-                paddingTop: '20px',
-                borderTop: '1px solid var(--color-border)',
-                fontSize: '0.78rem',
-                color: 'var(--color-text-muted)',
-                textAlign: 'center'
-              }}
-            >
-              <div style={{ padding: '8px' }}>
-                <Award size={20} color="var(--color-gold-dark)" style={{ marginBottom: '4px' }} />
+            <div className="grid grid-cols-3 gap-2 pt-5 border-t border-gray-200 text-[0.72rem] sm:text-xs text-gray-500 text-center">
+              <div className="p-2">
+                <Award size={18} className="mx-auto text-gold-dark mb-1" />
                 <div>BIS 22K/18K Hallmark</div>
               </div>
-              <div style={{ padding: '8px' }}>
-                <Truck size={20} color="var(--color-gold-dark)" style={{ marginBottom: '4px' }} />
+              <div className="p-2">
+                <Truck size={18} className="mx-auto text-gold-dark mb-1" />
                 <div>Insured Free Shipping</div>
               </div>
-              <div style={{ padding: '8px' }}>
-                <RotateCcw size={20} color="var(--color-gold-dark)" style={{ marginBottom: '4px' }} />
+              <div className="p-2">
+                <RotateCcw size={18} className="mx-auto text-gold-dark mb-1" />
                 <div>14-Day Return Policy</div>
               </div>
             </div>
@@ -413,17 +287,9 @@ export function ProductDetailPage({
         </div>
 
         {/* TABBED DETAILS & SPECS */}
-        <div
-          style={{
-            marginTop: '50px',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid var(--color-border)',
-            borderRadius: '4px',
-            overflow: 'hidden'
-          }}
-        >
+        <div className="mt-12 bg-white border border-gray-200 rounded-sm overflow-hidden shadow-subtle">
           {/* Tab Headers */}
-          <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', backgroundColor: '#FAF6F0' }}>
+          <div className="flex overflow-x-auto border-b border-gray-200 bg-[#FAF6F0] no-scrollbar">
             {[
               { id: 'description', label: 'Description' },
               { id: 'specifications', label: 'Specifications & Purity' },
@@ -433,17 +299,11 @@ export function ProductDetailPage({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                style={{
-                  padding: '16px 28px',
-                  fontFamily: "'Outfit', sans-serif",
-                  fontSize: '0.85rem',
-                  fontWeight: activeTab === tab.id ? '600' : '400',
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  color: activeTab === tab.id ? 'var(--color-gold-dark)' : 'var(--color-charcoal)',
-                  backgroundColor: activeTab === tab.id ? '#FFFFFF' : 'transparent',
-                  borderBottom: activeTab === tab.id ? '2px solid var(--color-gold)' : 'none'
-                }}
+                className={`px-6 py-4 font-sans text-xs sm:text-sm font-medium uppercase tracking-wider whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
+                  activeTab === tab.id
+                    ? 'border-gold bg-white text-gold-dark font-semibold'
+                    : 'border-transparent text-charcoal hover:text-gold bg-transparent'
+                }`}
               >
                 {tab.label}
               </button>
@@ -451,34 +311,29 @@ export function ProductDetailPage({
           </div>
 
           {/* Tab Body */}
-          <div style={{ padding: '36px' }}>
+          <div className="p-6 sm:p-10">
             {activeTab === 'description' && (
               <div>
-                <h3 style={{ fontSize: '1.3rem', marginBottom: '16px' }}>Craftsmanship & Story</h3>
-                <p style={{ fontSize: '0.98rem', color: 'var(--color-text-main)', lineHeight: 1.8, maxWidth: '800px' }}>
+                <h3 className="font-heading text-xl mb-4">Craftsmanship & Story</h3>
+                <p className="text-sm sm:text-base text-charcoal leading-relaxed max-w-3xl">
                   {product.description}
                 </p>
               </div>
             )}
 
             {activeTab === 'specifications' && (
-              <div style={{ maxWidth: '650px' }}>
-                <h3 style={{ fontSize: '1.3rem', marginBottom: '20px' }}>Technical Metal & Gemstone Specs</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="max-w-2xl">
+                <h3 className="font-heading text-xl mb-4">Technical Metal & Gemstone Specs</h3>
+                <div className="flex flex-col gap-2">
                   {product.specifications?.map((spec, i) => (
                     <div
                       key={i}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        padding: '12px 16px',
-                        backgroundColor: i % 2 === 0 ? '#FAF6F0' : '#FFFFFF',
-                        border: '1px solid var(--color-border)',
-                        fontSize: '0.9rem'
-                      }}
+                      className={`flex justify-between p-3 border border-gray-200 text-xs sm:text-sm ${
+                        i % 2 === 0 ? 'bg-[#FAF6F0]' : 'bg-white'
+                      }`}
                     >
-                      <span style={{ fontWeight: '500', color: 'var(--color-charcoal)' }}>{spec.label}</span>
-                      <span style={{ color: 'var(--color-text-muted)' }}>{spec.value}</span>
+                      <span className="font-medium text-charcoal">{spec.label}</span>
+                      <span className="text-gray-600">{spec.value}</span>
                     </div>
                   ))}
                 </div>
@@ -486,33 +341,33 @@ export function ProductDetailPage({
             )}
 
             {activeTab === 'seller' && (
-              <div style={{ maxWidth: '700px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
+              <div className="max-w-2xl">
+                <div className="flex items-center gap-4 mb-4">
                   <img
                     src={seller.logo}
                     alt={seller.name}
-                    style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover' }}
+                    className="w-16 h-16 rounded-full object-cover border border-gold/30"
                   />
                   <div>
-                    <h3 style={{ fontSize: '1.25rem', margin: 0 }}>{seller.name}</h3>
-                    <p style={{ fontSize: '0.84rem', color: 'var(--color-text-muted)', margin: '2px 0' }}>
+                    <h3 className="font-heading text-xl">{seller.name}</h3>
+                    <p className="text-xs text-gray-500">
                       {seller.city} • Verified Jewellery Artisan
                     </p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#D4AF37' }}>
-                      <Star size={14} fill="#D4AF37" /> {seller.rating} rating
+                    <div className="flex items-center gap-1 text-xs text-amber-500 mt-0.5 font-semibold">
+                      <Star size={14} fill="currentColor" /> {seller.rating} rating
                     </div>
                   </div>
                 </div>
-                <p style={{ fontSize: '0.92rem', color: 'var(--color-text-main)', lineHeight: 1.7 }}>
+                <p className="text-sm text-charcoal leading-relaxed">
                   {seller.about || 'Specialized in hand-crafted gold, diamond, and Kundan creations with certified authenticity.'}
                 </p>
               </div>
             )}
 
             {activeTab === 'shipping' && (
-              <div style={{ maxWidth: '750px' }}>
-                <h3 style={{ fontSize: '1.3rem', marginBottom: '16px' }}>Guaranteed Authenticity & Insured Transit</h3>
-                <ul style={{ listStyle: 'disc', paddingLeft: '20px', lineHeight: 1.8, fontSize: '0.92rem', color: 'var(--color-text-muted)' }}>
+              <div className="max-w-2xl">
+                <h3 className="font-heading text-xl mb-4">Guaranteed Authenticity & Insured Transit</h3>
+                <ul className="list-disc pl-5 space-y-2 text-xs sm:text-sm text-gray-600 leading-relaxed">
                   <li>All gold jewellery items are BIS 916 (22K) or 750 (18K) hallmarked with unique HUID codes.</li>
                   <li>Solitaire diamonds and precious gemstones come accompanied by GIA, IGI, or SGL certificates.</li>
                   <li>Shipments are fully insured against transit damage or loss, packaged in tamper-proof video-recorded security bags.</li>
@@ -525,40 +380,42 @@ export function ProductDetailPage({
 
         {/* RELATED PRODUCTS */}
         {relatedProducts.length > 0 && (
-          <div style={{ marginTop: '70px' }}>
-            <h2 style={{ fontSize: '1.8rem', marginBottom: '28px', fontFamily: "'Marcellus', serif" }}>
+          <div className="mt-16">
+            <h2 className="font-heading text-2xl mb-6">
               You May Also Admire
             </h2>
-            <div className="grid-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               {relatedProducts.map((p) => (
                 <div
                   key={p.id}
                   onClick={() => onSelectProduct(p)}
-                  className="product-card"
-                  style={{ cursor: 'pointer' }}
+                  className="product-card group rounded-sm bg-white border border-gray-200 overflow-hidden cursor-pointer shadow-sm hover:shadow-medium transition-all"
                 >
-                  <div className="product-image-wrap">
-                    <img src={p.images ? p.images[0] : p.image} alt={p.name} className="product-image-primary" />
+                  <div className="product-image-wrap aspect-square overflow-hidden bg-[#FAF8F5]">
+                    <img src={p.images ? p.images[0] : p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   </div>
-                  <div style={{ padding: '16px' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-gold-dark)', textTransform: 'uppercase' }}>
+                  <div className="p-4">
+                    <div className="text-xs text-gold-dark uppercase tracking-wider mb-1">
                       {p.sellerName}
                     </div>
-                    <h4 style={{ fontSize: '0.96rem', margin: '4px 0 8px' }}>{p.name}</h4>
-                    <div style={{ fontWeight: '600' }}>₹{p.price.toLocaleString('en-IN')}</div>
+                    <h4 className="text-sm font-normal text-charcoal line-clamp-1 mb-1">{p.name}</h4>
+                    <div className="font-semibold text-sm">₹{p.price.toLocaleString('en-IN')}</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
-      </div>
 
-      <style>{`
-        @media (max-width: 992px) {
-          .pdp-main-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
+        {/* Image Modal Lightbox */}
+        <ImageModal
+          isOpen={isImageModalOpen}
+          onClose={() => setIsImageModalOpen(false)}
+          images={images}
+          initialIndex={selectedImageIdx}
+          title={product.name}
+        />
+      </div>
     </div>
   );
 }

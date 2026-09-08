@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Trash2, Plus, Minus, ArrowRight, ShieldCheck, ShoppingBag } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Trash2, Plus, Minus, ArrowRight, ShieldCheck, ShoppingBag, Loader2 } from 'lucide-react';
 
 export function CartDrawer({
   isOpen,
@@ -9,6 +9,8 @@ export function CartDrawer({
   onRemoveItem,
   onCheckout
 }) {
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
+
   if (!isOpen) return null;
 
   const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
@@ -16,141 +18,74 @@ export function CartDrawer({
   const total = subtotal + gst;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(17, 17, 17, 0.65)',
-        backdropFilter: 'blur(4px)',
-        zIndex: 210,
-        display: 'flex',
-        justifyContent: 'flex-end'
-      }}
-    >
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '460px',
-          height: '100%',
-          backgroundColor: '#FAF6F0',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: 'var(--shadow-drawer)',
-          animation: 'slideLeft 0.3s cubic-bezier(0.25, 1, 0.5, 1)'
-        }}
-      >
+    <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[210] flex justify-end">
+      <div className="w-full sm:w-[460px] h-full bg-[#FAF6F0] flex flex-col shadow-drawer animate-slideLeft">
         {/* Header */}
-        <div
-          style={{
-            padding: '20px 24px',
-            borderBottom: '1px solid var(--color-border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: '#FFFFFF'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ShoppingBag size={20} color="var(--color-gold-dark)" />
-            <h3 style={{ fontSize: '1.25rem' }}>Your Shopping Bag</h3>
-            <span
-              style={{
-                fontSize: '0.75rem',
-                backgroundColor: 'var(--bg-tertiary)',
-                color: 'var(--color-gold-dark)',
-                padding: '2px 8px',
-                borderRadius: '10px',
-                fontWeight: '600'
-              }}
-            >
+        <div className="p-5 border-b border-gray-200 flex items-center justify-between bg-white">
+          <div className="flex items-center gap-2.5">
+            <ShoppingBag size={20} className="text-gold-dark" />
+            <h3 className="font-heading text-lg sm:text-xl">Your Shopping Bag</h3>
+            <span className="text-xs bg-[#F5E7D6] text-gold-dark px-2.5 py-0.5 rounded-full font-semibold">
               {cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}
             </span>
           </div>
           <button
             onClick={onClose}
-            style={{ padding: '6px', color: 'var(--color-charcoal)' }}
+            className="p-1 text-charcoal hover:text-gold transition-colors border-none bg-transparent cursor-pointer"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Cart Content List */}
-        <div style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
+        <div className="flex-1 p-5 overflow-y-auto">
           {cartItems.length === 0 ? (
-            <div
-              style={{
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                color: 'var(--color-text-muted)'
-              }}
-            >
-              <ShoppingBag size={48} strokeWidth={1} color="var(--color-gold)" style={{ marginBottom: '16px' }} />
-              <h4 style={{ fontSize: '1.2rem', marginBottom: '8px' }}>Your Shopping Bag is Empty</h4>
-              <p style={{ fontSize: '0.86rem', maxWidth: '280px', marginBottom: '24px' }}>
+            <div className="h-full flex flex-col items-center justify-center text-center text-gray-500">
+              <ShoppingBag size={48} strokeWidth={1} className="text-gold mb-4" />
+              <h4 className="font-heading text-xl mb-2 text-charcoal">Your Shopping Bag is Empty</h4>
+              <p className="text-xs sm:text-sm max-w-xs mb-6">
                 Explore our handpicked collection of royal gold, diamond, and Kundan creations.
               </p>
-              <button onClick={onClose} className="btn-gold">
+              <button onClick={onClose} className="btn-gold text-xs py-3 px-6">
                 EXPLORE JEWELLERY
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="flex flex-col gap-4">
               {cartItems.map((item) => (
                 <div
                   key={item.id}
-                  style={{
-                    display: 'flex',
-                    gap: '14px',
-                    padding: '14px',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '4px'
-                  }}
+                  className="bg-white p-3.5 border border-gray-200 rounded-sm flex gap-3.5 items-center"
                 >
                   <img
-                    src={item.image || item.images?.[0]}
+                    src={item.image}
                     alt={item.name}
-                    style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '2px' }}
+                    className="w-20 h-20 object-cover rounded-sm border border-gray-100 flex-shrink-0"
                   />
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--color-brown-muted)', textTransform: 'uppercase' }}>
-                        Sold by {item.sellerName}
-                      </div>
-                      <h4 style={{ fontSize: '0.94rem', margin: '2px 0 4px', lineHeight: 1.3 }}>
-                        {item.name}
-                      </h4>
-                      <div style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--color-charcoal)' }}>
-                        ₹{item.price.toLocaleString('en-IN')}
-                      </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[0.68rem] text-gold-dark uppercase font-medium truncate">
+                      {item.sellerName}
+                    </div>
+                    <h4 className="text-xs sm:text-sm font-normal text-charcoal truncate mb-1">
+                      {item.name}
+                    </h4>
+                    <div className="font-semibold text-sm text-charcoal mb-2">
+                      ₹{item.price.toLocaleString('en-IN')}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
-                      {/* Qty Controls */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          border: '1px solid var(--color-border)',
-                          borderRadius: '2px'
-                        }}
-                      >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center border border-gray-200 rounded-sm bg-[#FAF6F0]">
                         <button
                           onClick={() => onUpdateQty(item.id, item.quantity - 1)}
-                          style={{ padding: '4px 8px', color: 'var(--color-charcoal)' }}
+                          className="px-2 py-0.5 text-charcoal border-none bg-transparent cursor-pointer"
                         >
                           <Minus size={12} />
                         </button>
-                        <span style={{ padding: '0 8px', fontSize: '0.82rem', fontWeight: '600' }}>
-                          {item.quantity}
-                        </span>
+                        <span className="px-2.5 text-xs font-semibold">{item.quantity}</span>
                         <button
                           onClick={() => onUpdateQty(item.id, item.quantity + 1)}
-                          style={{ padding: '4px 8px', color: 'var(--color-charcoal)' }}
+                          className="px-2 py-0.5 text-charcoal border-none bg-transparent cursor-pointer"
                         >
                           <Plus size={12} />
                         </button>
@@ -158,9 +93,10 @@ export function CartDrawer({
 
                       <button
                         onClick={() => onRemoveItem(item.id)}
-                        style={{ color: '#C5221F', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        className="text-gray-400 hover:text-red-600 p-1 border-none bg-transparent cursor-pointer"
+                        title="Remove item"
                       >
-                        <Trash2 size={14} /> Remove
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
@@ -170,80 +106,59 @@ export function CartDrawer({
           )}
         </div>
 
-        {/* Footer Summary & Checkout */}
+        {/* Footer Checkout Summary */}
         {cartItems.length > 0 && (
-          <div
-            style={{
-              padding: '20px 24px',
-              backgroundColor: '#FFFFFF',
-              borderTop: '1px solid var(--color-border)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--color-text-muted)' }}>
-              <span>Subtotal</span>
-              <span>₹{subtotal.toLocaleString('en-IN')}</span>
+          <div className="p-5 bg-white border-t border-gray-200 shadow-sm">
+            <div className="flex flex-col gap-2 mb-4 text-xs sm:text-sm">
+              <div className="flex justify-between text-gray-600">
+                <span>Subtotal</span>
+                <span>₹{subtotal.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-gray-600">
+                <span>Estimated GST (3%)</span>
+                <span>₹{gst.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-gray-600">
+                <span>Insured Express Shipping</span>
+                <span className="text-emerald-700 font-medium">FREE</span>
+              </div>
+              <div className="flex justify-between font-bold text-base text-charcoal pt-2 border-t border-gray-100">
+                <span>Total Amount</span>
+                <span>₹{total.toLocaleString('en-IN')}</span>
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--color-text-muted)' }}>
-              <span>3% Jewellery GST Tax</span>
-              <span>₹{gst.toLocaleString('en-IN')}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: '#137333' }}>
-              <span>Insured Shipping</span>
-              <span>FREE</span>
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '1.15rem',
-                fontWeight: '600',
-                color: 'var(--color-charcoal)',
-                paddingTop: '10px',
-                borderTop: '1px dashed var(--color-border)',
-                fontFamily: "'Marcellus', serif"
-              }}
-            >
-              <span>Total</span>
-              <span>₹{total.toLocaleString('en-IN')}</span>
+
+            <div className="flex items-center gap-2 text-[0.7rem] text-gray-500 bg-[#FAF6F0] p-2.5 rounded-sm mb-4">
+              <ShieldCheck size={16} className="text-gold-dark shrink-0" />
+              <span>100% BIS Hallmarked & Insured Transit Guarantee</span>
             </div>
 
             <button
-              onClick={() => {
+              disabled={isCheckoutLoading}
+              onClick={async () => {
+                setIsCheckoutLoading(true);
+                await new Promise((resolve) => setTimeout(resolve, 300));
+                setIsCheckoutLoading(false);
                 onClose();
                 onCheckout();
               }}
-              className="btn-gold"
-              style={{ width: '100%', marginTop: '8px', padding: '16px' }}
+              className="btn-gold w-full py-3.5 text-xs font-semibold flex items-center justify-center gap-2 disabled:opacity-80"
             >
-              PROCEED TO CHECKOUT <ArrowRight size={16} />
+              {isCheckoutLoading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin text-white" />
+                  <span>PROCEEDING...</span>
+                </>
+              ) : (
+                <>
+                  <span>PROCEED TO CHECKOUT</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
             </button>
-
-            <div
-              style={{
-                fontSize: '0.72rem',
-                color: 'var(--color-text-muted)',
-                textAlign: 'center',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
-            >
-              <ShieldCheck size={14} color="var(--color-gold)" /> 100% Insured Delivery & BIS Hallmarked Authentic Guarantee
-            </div>
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes slideLeft {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
-        }
-      `}</style>
     </div>
   );
 }

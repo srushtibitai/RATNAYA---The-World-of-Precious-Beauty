@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PRODUCTS, SELLERS, MOCK_ORDERS } from '../data/marketplaceData';
+import { api } from '../services/api';
+import ImageModal from './ImageModal';
 import {
   LayoutDashboard,
   Package,
@@ -15,15 +17,123 @@ import {
   Clock,
   Upload,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Edit,
+  Edit3,
+  X,
+  ZoomIn
 } from 'lucide-react';
 
-export function SellerDashboardPage({ sellerId = 'seller-1' }) {
-  const seller = SELLERS.find((s) => s.id === sellerId) || SELLERS[0];
+export function SellerDashboardPage({ currentUser, sellerId }) {
+  const sellerFromData = SELLERS.find((s) => s.id === sellerId || s.id === currentUser?.id);
+  const seller = currentUser ? {
+    id: currentUser.id || 'seller-custom',
+    name: currentUser.name || currentUser.businessName || 'Verified Jeweller',
+    owner: currentUser.owner || currentUser.name || 'Merchant Partner',
+    gst: currentUser.gst || '22AAAAA0000A1Z5',
+    rating: 5.0,
+    reviewsCount: 0,
+    commissionRate: currentUser.commissionRate || 10,
+    logo: sellerFromData ? sellerFromData.logo : '/assets/jewellery/ring/1.jpg'
+  } : (sellerFromData || SELLERS[0]);
+
   const [activeTab, setActiveTab] = useState('overview');
   const [sellerProductsList, setSellerProductsList] = useState(
-    PRODUCTS.filter((p) => p.sellerId === seller.id)
+    PRODUCTS.filter((p) => p.sellerId === seller.id || p.sellerName === seller.name)
   );
+
+  // Image Lightbox Modal State
+  const [previewModal, setPreviewModal] = useState({
+    isOpen: false,
+    images: [],
+    initialIndex: 0,
+    title: ''
+  });
+
+  // Edit Product Modal State
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleImageFileUpload = async (file, callback) => {
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const res = await api.uploadImage(file);
+      if (res && res.success && res.url) {
+        callback(res.url);
+      } else {
+        const reader = new FileReader();
+        reader.onloadend = () => callback(reader.result);
+        reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      console.warn('Image upload fallback:', err);
+      const reader = new FileReader();
+      reader.onloadend = () => callback(reader.result);
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleEditClick = (p) => {
+    const primaryImg = p.image || (p.images ? p.images[0] : '/assets/jewellery/necklace/1.jpg');
+    const secondaryImg = (p.images && p.images[1]) || p.image2 || primaryImg;
+    setEditingProduct({
+      ...p,
+      image: primaryImg,
+      image2: secondaryImg
+    });
+  };
+
+  const handleEditProductSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+
+    const prodId = editingProduct.id || editingProduct._id;
+    const primaryImg = editingProduct.image || '/assets/jewellery/necklace/1.jpg';
+    const secondaryImg = editingProduct.image2 || primaryImg;
+
+    const updatedData = {
+      ...editingProduct,
+      price: Number(editingProduct.price),
+      originalPrice: editingProduct.originalPrice ? Number(editingProduct.originalPrice) : null,
+      stock: Number(editingProduct.stock),
+      image: primaryImg,
+      images: [primaryImg, secondaryImg],
+      approvalStatus: 'Pending Approval',
+      status: 'Pending Approval',
+      resubmittedAt: new Date()
+    };
+
+    setSellerProductsList((prev) =>
+      prev.map((item) => ((item.id === prodId || item._id === prodId) ? updatedData : item))
+    );
+
+    try {
+      await api.updateProduct(prodId, updatedData);
+    } catch (err) {
+      console.error('Error updating product:', err);
+    }
+
+    setEditingProduct(null);
+    alert(`Product "${updatedData.name}" updated and resubmitted to Admin for approval!`);
+  };
+
+  // Load Seller's Products from Backend Database API on mount
+  useEffect(() => {
+    async function loadSellerProducts() {
+      try {
+        const res = await api.getProducts({ sellerId: seller.id });
+        if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setSellerProductsList(res.data);
+        }
+      } catch (err) {
+        console.warn('Backend seller products fetch warning:', err);
+      }
+    }
+    loadSellerProducts();
+  }, [seller.id]);
 
   // New Product Form State
   const [newProduct, setNewProduct] = useState({
@@ -42,28 +152,60 @@ export function SellerDashboardPage({ sellerId = 'seller-1' }) {
     color: 'Gold & Green',
     size: '18 Inch',
     description: '',
-    image: '/assets/jewellery/necklace/1.jpg'
+    image: '/assets/jewellery/necklace/1.jpg',
+    image2: '/assets/jewellery/necklace/2.jpg'
   });
 
   const [productAddedSuccess, setProductAddedSuccess] = useState(false);
 
-  const handleAddProductSubmit = (e) => {
+  const handleAddProductSubmit = async (e) => {
     e.preventDefault();
+    const primaryImg = newProduct.image || '/assets/jewellery/necklace/1.jpg';
+    const secondaryImg = newProduct.image2 || primaryImg;
+
     const createdProduct = {
-      id: `prod-${Date.now()}`,
-      ...newProduct,
+      id: `prod-req-${Date.now()}`,
+      sku: newProduct.sku || `SKU-${Date.now().toString().slice(-6)}`,
+      name: newProduct.name,
+      category: newProduct.category || 'necklaces',
+      categoryName: newProduct.categoryName || 'Necklaces',
       price: Number(newProduct.price),
       originalPrice: newProduct.originalPrice ? Number(newProduct.originalPrice) : null,
+      metal: newProduct.metal || '22K Gold',
+      purity: newProduct.purity || '22K BIS Hallmarked',
+      description: newProduct.description,
       sellerId: seller.id,
       sellerName: seller.name,
       sellerRating: seller.rating,
       rating: 5.0,
       reviewsCount: 0,
       approvalStatus: 'Pending Approval', // Admin approval required!
-      images: [newProduct.image]
+      status: 'Pending Approval',
+      submittedDate: new Date().toISOString().split('T')[0],
+      image: primaryImg,
+      images: [primaryImg, secondaryImg]
     };
 
+    // Update local seller dashboard list
     setSellerProductsList([createdProduct, ...sellerProductsList]);
+
+    // Save to global pending products for Admin Dashboard
+    try {
+      const savedPending = JSON.parse(localStorage.getItem('ratnaya_pending_products') || '[]');
+      const updatedPending = [createdProduct, ...savedPending];
+      localStorage.setItem('ratnaya_pending_products', JSON.stringify(updatedPending));
+    } catch (err) {
+      console.error('LocalStorage write error:', err);
+    }
+
+    // Call REST API backend to insert product in MongoDB Database
+    try {
+      const apiRes = await api.createProduct(createdProduct);
+      console.log('MongoDB Product Submission API Response:', apiRes);
+    } catch (err) {
+      console.error('Backend Product Creation Error:', err);
+    }
+
     setProductAddedSuccess(true);
     setTimeout(() => {
       setProductAddedSuccess(false);
@@ -74,37 +216,30 @@ export function SellerDashboardPage({ sellerId = 'seller-1' }) {
   const totalRevenue = sellerProductsList.reduce((acc, p) => acc + p.price * 3, 0);
 
   return (
-    <div style={{ backgroundColor: '#FAF6F0', minHeight: '90vh', paddingBottom: '80px' }}>
+    <div className="bg-[#FAF6F0] min-h-[90vh] pb-20">
       {/* Seller Header Bar */}
-      <div
-        style={{
-          backgroundColor: '#111111',
-          color: '#FFFFFF',
-          padding: '24px 0',
-          borderBottom: '1px solid var(--color-border-gold)'
-        }}
-      >
-        <div className="container">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="bg-[#111111] text-white py-6 border-b border-gold/30">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
               <img
                 src={seller.logo}
                 alt={seller.name}
-                style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #C5A059' }}
+                className="w-12 h-12 rounded-full object-cover border-2 border-gold shrink-0"
               />
               <div>
-                <span style={{ fontSize: '0.7rem', color: '#C5A059', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+                <span className="text-[0.68rem] text-gold tracking-widest uppercase font-semibold">
                   MERCHANT DASHBOARD
                 </span>
-                <h2 style={{ fontSize: '1.4rem', color: '#FFF', fontFamily: "'Marcellus', serif", margin: 0 }}>
+                <h2 className="font-heading text-xl sm:text-2xl text-white">
                   {seller.name}
                 </h2>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <span className="badge-gold">GST: {seller.gst}</span>
-              <span className="badge-approved" style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <div className="flex flex-wrap gap-2.5">
+              <span className="badge-gold text-xs">GST: {seller.gst}</span>
+              <span className="badge-approved text-xs flex items-center gap-1">
                 <CheckCircle2 size={12} /> Account Approved
               </span>
             </div>
@@ -112,11 +247,11 @@ export function SellerDashboardPage({ sellerId = 'seller-1' }) {
         </div>
       </div>
 
-      <div className="container" style={{ paddingTop: '32px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '32px' }} className="seller-dashboard-layout">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-8">
           {/* Sidebar */}
           <aside>
-            <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: '4px', overflow: 'hidden' }}>
+            <div className="bg-white border border-gray-200 rounded-sm overflow-hidden shadow-sm flex flex-row lg:flex-col overflow-x-auto no-scrollbar">
               {[
                 { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={18} /> },
                 { id: 'products', label: `My Products (${sellerProductsList.length})`, icon: <Package size={18} /> },
@@ -128,19 +263,11 @@ export function SellerDashboardPage({ sellerId = 'seller-1' }) {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '14px 18px',
-                    fontSize: '0.86rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    backgroundColor: activeTab === tab.id ? 'var(--bg-primary)' : 'transparent',
-                    color: activeTab === tab.id ? 'var(--color-gold-dark)' : 'var(--color-charcoal)',
-                    fontWeight: activeTab === tab.id ? '600' : '400',
-                    borderBottom: '1px solid var(--color-border)'
-                  }}
+                  className={`w-full text-left p-3.5 text-xs sm:text-sm flex items-center gap-3 whitespace-nowrap border-b border-gray-100 transition-colors cursor-pointer ${
+                    activeTab === tab.id
+                      ? 'bg-[#FAF6F0] text-gold-dark font-semibold border-l-4 border-l-gold'
+                      : 'text-charcoal hover:bg-gray-50 bg-transparent'
+                  }`}
                 >
                   {tab.icon} {tab.label}
                 </button>
@@ -149,105 +276,193 @@ export function SellerDashboardPage({ sellerId = 'seller-1' }) {
           </aside>
 
           {/* Main Dashboard Content */}
-          <main>
+          <main className="min-w-0">
             {/* OVERVIEW TAB */}
             {activeTab === 'overview' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              <div className="flex flex-col gap-6">
                 {/* Metrics Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }} className="metrics-grid">
-                  <div style={{ backgroundColor: '#FFFFFF', padding: '20px', border: '1px solid var(--color-border)', borderRadius: '4px' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#777', textTransform: 'uppercase' }}>Total Revenue</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--color-charcoal)', margin: '4px 0' }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white p-5 border border-gray-200 rounded-sm shadow-sm">
+                    <div className="text-xs text-gray-500 uppercase font-medium">Total Revenue</div>
+                    <div className="text-2xl font-semibold text-charcoal my-1">
                       ₹{totalRevenue.toLocaleString('en-IN')}
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: '#137333' }}>+18.4% from last month</span>
+                    <span className="text-xs text-emerald-700 font-medium">+18.4% from last month</span>
                   </div>
 
-                  <div style={{ backgroundColor: '#FFFFFF', padding: '20px', border: '1px solid var(--color-border)', borderRadius: '4px' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#777', textTransform: 'uppercase' }}>Total Orders</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--color-charcoal)', margin: '4px 0' }}>
+                  <div className="bg-white p-5 border border-gray-200 rounded-sm shadow-sm">
+                    <div className="text-xs text-gray-500 uppercase font-medium">Total Orders</div>
+                    <div className="text-2xl font-semibold text-charcoal my-1">
                       24 Orders
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--color-gold-dark)' }}>3 Pending fulfillment</span>
+                    <span className="text-xs text-gold-dark font-medium">3 Pending fulfillment</span>
                   </div>
 
-                  <div style={{ backgroundColor: '#FFFFFF', padding: '20px', border: '1px solid var(--color-border)', borderRadius: '4px' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#777', textTransform: 'uppercase' }}>Active Products</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--color-charcoal)', margin: '4px 0' }}>
+                  <div className="bg-white p-5 border border-gray-200 rounded-sm shadow-sm">
+                    <div className="text-xs text-gray-500 uppercase font-medium">Active Products</div>
+                    <div className="text-2xl font-semibold text-charcoal my-1">
                       {sellerProductsList.length} Items
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: '#777' }}>1 Pending Admin Review</span>
+                    <span className="text-xs text-gray-500">1 Pending Review</span>
                   </div>
 
-                  <div style={{ backgroundColor: '#FFFFFF', padding: '20px', border: '1px solid var(--color-border)', borderRadius: '4px' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#777', textTransform: 'uppercase' }}>Store Rating</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#D4AF37', margin: '4px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Star size={20} fill="#D4AF37" /> {seller.rating}
+                  <div className="bg-white p-5 border border-gray-200 rounded-sm shadow-sm">
+                    <div className="text-xs text-gray-500 uppercase font-medium">Store Rating</div>
+                    <div className="text-2xl font-semibold text-amber-500 my-1 flex items-center gap-1">
+                      <Star size={20} fill="currentColor" /> {seller.rating}
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: '#777' }}>Based on {seller.reviewsCount} reviews</span>
+                    <span className="text-xs text-gray-500">Based on {seller.reviewsCount} reviews</span>
                   </div>
                 </div>
 
                 {/* Seller Products Table Preview */}
-                <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '24px' }}>
-                  <h3 style={{ fontSize: '1.2rem', fontFamily: "'Marcellus', serif", marginBottom: '16px' }}>
+                <div className="bg-white border border-gray-200 rounded-sm p-6 shadow-sm overflow-hidden">
+                  <h3 className="font-heading text-xl mb-4">
                     Your Listed Jewellery Products
                   </h3>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--color-border)', textAlign: 'left', backgroundColor: '#FAF6F0' }}>
-                        <th style={{ padding: '12px' }}>Product</th>
-                        <th style={{ padding: '12px' }}>SKU</th>
-                        <th style={{ padding: '12px' }}>Price</th>
-                        <th style={{ padding: '12px' }}>Stock</th>
-                        <th style={{ padding: '12px' }}>Admin Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sellerProductsList.map((prod) => (
-                        <tr key={prod.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                          <td style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <img src={prod.images ? prod.images[0] : prod.image} alt="" style={{ width: '40px', height: '40px', objectFit: 'cover' }} />
-                            <div>
-                              <strong style={{ display: 'block' }}>{prod.name}</strong>
-                              <span style={{ fontSize: '0.74rem', color: '#888' }}>{prod.metal}</span>
-                            </div>
-                          </td>
-                          <td style={{ padding: '12px' }}>{prod.sku}</td>
-                          <td style={{ padding: '12px', fontWeight: '600' }}>₹{prod.price.toLocaleString('en-IN')}</td>
-                          <td style={{ padding: '12px' }}>{prod.stock}</td>
-                          <td style={{ padding: '12px' }}>
-                            <span className={`badge-status ${prod.approvalStatus === 'Approved' ? 'badge-approved' : 'badge-pending'}`}>
-                              {prod.approvalStatus || 'Approved'}
-                            </span>
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm border-collapse min-w-[600px]">
+                      <thead>
+                        <tr className="border-b border-gray-200 bg-[#FAF6F0] text-gray-600">
+                          <th className="p-3">Product</th>
+                          <th className="p-3">SKU</th>
+                          <th className="p-3">Price</th>
+                          <th className="p-3">Stock</th>
+                          <th className="p-3">Admin Status</th>
+                          <th className="p-3 text-right">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {sellerProductsList.map((prod) => (
+                          <tr key={prod.id || prod._id} className="hover:bg-gray-50">
+                            <td className="p-3 flex items-center gap-3">
+                              <div
+                                className="relative group cursor-pointer shrink-0"
+                                title="Click to enlarge image (Esc to close)"
+                                onClick={() =>
+                                  setPreviewModal({
+                                    isOpen: true,
+                                    images: prod.images && prod.images.length > 0 ? prod.images : [prod.image || '/assets/jewellery/necklace/1.jpg'],
+                                    initialIndex: 0,
+                                    title: prod.name
+                                  })
+                                }
+                              >
+                                <img src={prod.images ? prod.images[0] : prod.image} alt={prod.name} className="w-10 h-10 object-cover rounded-sm border border-gray-100 group-hover:opacity-85 transition-opacity" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-sm">
+                                  <ZoomIn size={13} className="text-white drop-shadow" />
+                                </div>
+                              </div>
+                              <div>
+                                <strong className="block text-charcoal">{prod.name}</strong>
+                                <span className="text-xs text-gray-400">{prod.metal}</span>
+                              </div>
+                            </td>
+                            <td className="p-3 font-mono text-xs">{prod.sku}</td>
+                            <td className="p-3 font-semibold">₹{prod.price ? Number(prod.price).toLocaleString('en-IN') : '0'}</td>
+                            <td className="p-3">{prod.stock}</td>
+                            <td className="p-3">
+                               <span className={`badge-status ${prod.approvalStatus === 'Approved' ? 'badge-approved' : prod.approvalStatus === 'Rejected' ? 'bg-rose-100 text-rose-800 border border-rose-200 font-bold' : 'badge-pending'}`}>
+                                 {prod.approvalStatus || 'Approved'}
+                               </span>
+                             </td>
+                            <td className="p-3 text-right">
+                              <button
+                                onClick={() => handleEditClick(prod)}
+                                className="px-2.5 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-charcoal flex items-center gap-1 ml-auto"
+                              >
+                                <Edit size={13} /> Edit
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* MY PRODUCTS TAB */}
             {activeTab === 'products' && (
-              <div style={{ backgroundColor: '#FFFFFF', padding: '28px', border: '1px solid var(--color-border)', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <h3 style={{ fontSize: '1.3rem', fontFamily: "'Marcellus', serif" }}>Managed Products</h3>
-                  <button onClick={() => setActiveTab('add-product')} className="btn-gold" style={{ padding: '8px 18px', fontSize: '0.78rem' }}>
+              <div className="bg-white p-6 border border-gray-200 rounded-sm shadow-sm">
+                <div className="flex items-center justify-between gap-4 mb-6">
+                  <h3 className="font-heading text-xl">Managed Products</h3>
+                  <button onClick={() => setActiveTab('add-product')} className="btn-gold py-2 px-4 text-xs">
                     <PlusCircle size={15} /> Add New Piece
                   </button>
                 </div>
-                <div className="grid-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                   {sellerProductsList.map((p) => (
-                    <div key={p.id} style={{ border: '1px solid var(--color-border)', borderRadius: '4px', overflow: 'hidden', padding: '12px' }}>
-                      <img src={p.images ? p.images[0] : p.image} alt={p.name} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover' }} />
-                      <div style={{ marginTop: '10px' }}>
-                        <span className={`badge-status ${p.approvalStatus === 'Approved' ? 'badge-approved' : 'badge-pending'}`}>
-                          {p.approvalStatus || 'Approved'}
-                        </span>
-                        <h4 style={{ fontSize: '0.94rem', margin: '6px 0 4px' }}>{p.name}</h4>
-                        <div style={{ fontWeight: '600' }}>₹{p.price.toLocaleString('en-IN')}</div>
+                    <div key={p.id || p._id} className="border border-gray-200 rounded-sm p-3 flex flex-col justify-between">
+                      <div
+                        className="relative group cursor-pointer overflow-hidden rounded-sm mb-3"
+                        title="Click to view full image (Esc to close)"
+                        onClick={() =>
+                          setPreviewModal({
+                            isOpen: true,
+                            images: p.images && p.images.length > 0 ? p.images : [p.image || '/assets/jewellery/necklace/1.jpg'],
+                            initialIndex: 0,
+                            title: p.name
+                          })
+                        }
+                      >
+                        <img src={p.images ? p.images[0] : p.image} alt={p.name} className="w-full aspect-square object-cover rounded-sm group-hover:scale-105 transition-transform duration-300" />
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <span className="bg-black/70 text-white text-xs px-2.5 py-1 rounded flex items-center gap-1 font-medium shadow-md">
+                            <ZoomIn size={14} /> Full View
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`badge-status text-xs ${p.approvalStatus === 'Approved' ? 'badge-approved' : p.approvalStatus === 'Rejected' ? 'bg-rose-100 text-rose-800 border border-rose-200 font-bold' : 'badge-pending'}`}>
+                            {p.approvalStatus || 'Approved'}
+                          </span>
+                          <button
+                            onClick={() => handleEditClick(p)}
+                            className="p-1 text-xs text-gray-500 hover:text-gold-dark flex items-center gap-1 font-medium"
+                            title="Edit Product & Resubmit"
+                          >
+                            <Edit size={14} /> Edit & Resubmit
+                          </button>
+                        </div>
+                        <h4 className="text-sm font-medium text-charcoal mt-2 mb-1 line-clamp-1">{p.name}</h4>
+                        <div className="font-semibold text-sm">₹{p.price ? Number(p.price).toLocaleString('en-IN') : '0'}</div>
+
+                        {/* Rejection Details Box */}
+                        {p.approvalStatus === 'Rejected' && (
+                          <div className="mt-2.5 p-2.5 bg-red-50 border border-red-200 rounded text-xs text-red-900 space-y-1">
+                            <div className="flex items-center justify-between font-bold text-[0.72rem]">
+                              <span className="flex items-center gap-1 text-red-700">
+                                <AlertCircle size={13} /> Rejected by Admin
+                              </span>
+                              <span className="text-[0.65rem] text-gray-500 font-mono">
+                                {p.rejectedAt ? new Date(p.rejectedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent'}
+                              </span>
+                            </div>
+                            <div className="text-[0.72rem] text-red-800 italic bg-white/80 p-1.5 rounded border border-red-100">
+                              "{p.rejectionReason || 'Please verify product details and resubmit.'}"
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Pending Re-approval Notice Box */}
+                        {p.approvalStatus === 'Pending Approval' && p.rejectionReason && (
+                          <div className="mt-2.5 p-2.5 bg-amber-50/90 border border-amber-200 rounded text-xs text-amber-900 space-y-1">
+                            <div className="flex items-center justify-between font-bold text-[0.72rem]">
+                              <span className="flex items-center gap-1 text-amber-800">
+                                <Clock size={13} /> Resubmitted for Re-approval
+                              </span>
+                              <span className="text-[0.65rem] text-gray-500 font-mono">
+                                Rejected: {p.rejectedAt ? new Date(p.rejectedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent'}
+                              </span>
+                            </div>
+                            <div className="text-[0.72rem] text-amber-800 italic bg-white/80 p-1.5 rounded border border-amber-100">
+                              Previous Note: "{p.rejectionReason}"
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -257,24 +472,24 @@ export function SellerDashboardPage({ sellerId = 'seller-1' }) {
 
             {/* ADD PRODUCT FORM TAB */}
             {activeTab === 'add-product' && (
-              <div style={{ backgroundColor: '#FFFFFF', padding: '32px', border: '1px solid var(--color-border)', borderRadius: '4px' }}>
-                <h3 style={{ fontSize: '1.4rem', fontFamily: "'Marcellus', serif", marginBottom: '8px' }}>
+              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm">
+                <h3 className="font-heading text-2xl mb-2">
                   Submit New Jewellery Product for Admin Approval
                 </h3>
-                <p style={{ fontSize: '0.86rem', color: 'var(--color-text-muted)', marginBottom: '24px' }}>
+                <p className="text-xs sm:text-sm text-gray-500 mb-6">
                   Provide complete metal purity, weight, and gemstone specifications. Products are reviewed by Ratnaya compliance before appearing publicly.
                 </p>
 
                 {productAddedSuccess && (
-                  <div style={{ backgroundColor: '#E6F4EA', color: '#137333', padding: '16px', borderRadius: '4px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div className="bg-emerald-50 text-emerald-800 p-4 rounded-sm mb-6 flex items-center gap-2 text-sm">
                     <CheckCircle2 size={20} /> Product submitted! Pending Admin Review.
                   </div>
                 )}
 
-                <form onSubmit={handleAddProductSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div style={{ gridColumn: 'span 2' }}>
-                      <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#666' }}>Product Name *</label>
+                <form onSubmit={handleAddProductSubmit} className="flex flex-col gap-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Product Name *</label>
                       <input
                         type="text"
                         required
@@ -286,7 +501,7 @@ export function SellerDashboardPage({ sellerId = 'seller-1' }) {
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#666' }}>Category</label>
+                      <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Category</label>
                       <select
                         value={newProduct.category}
                         onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
@@ -301,7 +516,7 @@ export function SellerDashboardPage({ sellerId = 'seller-1' }) {
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#666' }}>Price (₹ INR) *</label>
+                      <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Price (₹ INR) *</label>
                       <input
                         type="number"
                         required
@@ -313,7 +528,7 @@ export function SellerDashboardPage({ sellerId = 'seller-1' }) {
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#666' }}>Metal Type</label>
+                      <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Metal Type</label>
                       <input
                         type="text"
                         value={newProduct.metal}
@@ -323,7 +538,7 @@ export function SellerDashboardPage({ sellerId = 'seller-1' }) {
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#666' }}>Purity (BIS Hallmark)</label>
+                      <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Purity (BIS Hallmark)</label>
                       <input
                         type="text"
                         value={newProduct.purity}
@@ -332,28 +547,157 @@ export function SellerDashboardPage({ sellerId = 'seller-1' }) {
                       />
                     </div>
 
-                    <div>
-                      <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#666' }}>Gross Weight (grams)</label>
-                      <input
-                        type="text"
-                        value={newProduct.weight}
-                        onChange={(e) => setNewProduct({ ...newProduct, weight: e.target.value })}
-                        className="input-field"
-                      />
+                    {/* Product Dual Image Upload Section */}
+                    <div className="sm:col-span-2 space-y-4">
+                      <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                        <label className="text-xs font-semibold uppercase text-gold-dark tracking-wider block">
+                          Product Images (Front View & Secondary Hover View) *
+                        </label>
+                        <span className="text-[0.68rem] text-gray-400">Upload 2 images for smooth hover card effect</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Image 1: Main Front Cover Photo */}
+                        <div className="bg-gray-50/90 p-4 border border-gray-200 rounded-sm">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-charcoal flex items-center gap-1.5">
+                              <span className="w-5 h-5 rounded-full bg-gold text-white text-[0.65rem] flex items-center justify-center font-bold">1</span>
+                              Main Front Cover Photo *
+                            </span>
+                            <span className="text-[0.65rem] bg-gold/15 text-gold-dark font-medium px-2 py-0.5 rounded">Default View</span>
+                          </div>
+
+                          <div className="flex gap-3 items-start">
+                            {/* Live Preview 1 */}
+                            <div className="w-24 h-24 rounded-sm border border-gray-300 bg-white overflow-hidden flex items-center justify-center relative shrink-0 shadow-sm">
+                              {newProduct.image ? (
+                                <img src={newProduct.image} alt="Front Preview" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="text-center p-2 text-gray-400">
+                                  <Upload className="mx-auto mb-1" size={18} />
+                                  <span className="text-[0.6rem]">Front View</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex-1 space-y-2">
+                              <input
+                                type="text"
+                                required
+                                placeholder="Image 1 URL or File"
+                                value={newProduct.image}
+                                onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })}
+                                className="input-field text-xs bg-white py-1.5"
+                              />
+
+                              <label className="btn-outline-gold py-1 px-2.5 text-[0.7rem] cursor-pointer inline-flex items-center gap-1 bg-white">
+                                <Upload size={12} /> Upload File 1
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files && e.target.files[0];
+                                    if (file) {
+                                      handleImageFileUpload(file, (url) => setNewProduct((prev) => ({ ...prev, image: url })));
+                                    }
+                                  }}
+                                />
+                              </label>
+
+                              {/* Presets for Image 1 */}
+                              <div className="flex flex-wrap gap-1 pt-1">
+                                {[
+                                  { label: 'Necklace 1', url: '/assets/jewellery/necklace/1.jpg' },
+                                  { label: 'Ring 1', url: '/assets/jewellery/ring/1.jpg' },
+                                  { label: 'Earring 1', url: '/assets/jewellery/earring/1.jpg' }
+                                ].map((p) => (
+                                  <button
+                                    key={p.label}
+                                    type="button"
+                                    onClick={() => setNewProduct({ ...newProduct, image: p.url })}
+                                    className="text-[0.62rem] px-1.5 py-0.5 border border-gray-300 rounded bg-white hover:border-gold"
+                                  >
+                                    {p.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Image 2: Secondary Hover Photo */}
+                        <div className="bg-gray-50/90 p-4 border border-gray-200 rounded-sm">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-charcoal flex items-center gap-1.5">
+                              <span className="w-5 h-5 rounded-full bg-charcoal text-white text-[0.65rem] flex items-center justify-center font-bold">2</span>
+                              Secondary Angle Photo (Hover View)
+                            </span>
+                            <span className="text-[0.65rem] bg-gray-200 text-gray-700 font-medium px-2 py-0.5 rounded">Hover Effect</span>
+                          </div>
+
+                          <div className="flex gap-3 items-start">
+                            {/* Live Preview 2 */}
+                            <div className="w-24 h-24 rounded-sm border border-gray-300 bg-white overflow-hidden flex items-center justify-center relative shrink-0 shadow-sm">
+                              {newProduct.image2 ? (
+                                <img src={newProduct.image2} alt="Hover Preview" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="text-center p-2 text-gray-400">
+                                  <Upload className="mx-auto mb-1" size={18} />
+                                  <span className="text-[0.6rem]">Side / Model</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex-1 space-y-2">
+                              <input
+                                type="text"
+                                placeholder="Image 2 URL or File"
+                                value={newProduct.image2 || ''}
+                                onChange={(e) => setNewProduct({ ...newProduct, image2: e.target.value })}
+                                className="input-field text-xs bg-white py-1.5"
+                              />
+
+                              <label className="btn-outline-gold py-1 px-2.5 text-[0.7rem] cursor-pointer inline-flex items-center gap-1 bg-white">
+                                <Upload size={12} /> Upload File 2
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files && e.target.files[0];
+                                    if (file) {
+                                      handleImageFileUpload(file, (url) => setNewProduct((prev) => ({ ...prev, image2: url })));
+                                    }
+                                  }}
+                                />
+                              </label>
+
+                              {/* Presets for Image 2 */}
+                              <div className="flex flex-wrap gap-1 pt-1">
+                                {[
+                                  { label: 'Angle 2', url: '/assets/jewellery/necklace/2.jpg' },
+                                  { label: 'Model View', url: '/assets/jewellery/ring/2.jpg' },
+                                  { label: 'Close Up', url: '/assets/jewellery/earring/2.jpg' }
+                                ].map((p) => (
+                                  <button
+                                    key={p.label}
+                                    type="button"
+                                    onClick={() => setNewProduct({ ...newProduct, image2: p.url })}
+                                    className="text-[0.62rem] px-1.5 py-0.5 border border-gray-300 rounded bg-white hover:border-gold"
+                                  >
+                                    {p.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    <div>
-                      <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#666' }}>Gemstone / Polki Info</label>
-                      <input
-                        type="text"
-                        value={newProduct.gemstone}
-                        onChange={(e) => setNewProduct({ ...newProduct, gemstone: e.target.value })}
-                        className="input-field"
-                      />
-                    </div>
-
-                    <div style={{ gridColumn: 'span 2' }}>
-                      <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#666' }}>Product Description</label>
+                    <div className="sm:col-span-2">
+                      <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Product Description</label>
                       <textarea
                         rows={4}
                         placeholder="Detail the craftsmanship, Meenakari work, gold purity, and design inspiration..."
@@ -364,22 +708,350 @@ export function SellerDashboardPage({ sellerId = 'seller-1' }) {
                     </div>
                   </div>
 
-                  <button type="submit" className="btn-gold" style={{ padding: '14px' }}>
+                  <button type="submit" className="btn-gold py-3.5 text-xs font-semibold">
                     SUBMIT PRODUCT FOR ADMIN APPROVAL
                   </button>
                 </form>
+              </div>
+            )}
+
+            {/* EARNINGS & PAYOUTS TAB */}
+            {activeTab === 'earnings' && (
+              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm">
+                <h3 className="font-heading text-2xl mb-2">
+                  Merchant Earnings & Admin Commission Breakdown
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-500 mb-6">
+                  Transparency report showing gross marketplace sales, platform commission deductions, and net payouts.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                  <div className="p-5 bg-[#FAF6F0] border border-gray-200 rounded-sm">
+                    <span className="text-xs uppercase text-gray-500">Gross Sales Revenue</span>
+                    <h4 className="font-heading text-2xl my-1 text-charcoal">
+                      ₹{totalRevenue.toLocaleString('en-IN')}
+                    </h4>
+                  </div>
+                  <div className="p-5 bg-[#FAF6F0] border border-gray-200 rounded-sm">
+                    <span className="text-xs uppercase text-gray-500">Admin Commission ({seller.commissionRate || 10}%)</span>
+                    <h4 className="font-heading text-2xl my-1 text-gold-dark">
+                      ₹{Math.round(totalRevenue * ((seller.commissionRate || 10) / 100)).toLocaleString('en-IN')}
+                    </h4>
+                  </div>
+                  <div className="p-5 bg-[#FAF6F0] border border-gray-200 rounded-sm">
+                    <span className="text-xs uppercase text-gray-500">Net Bank Payout</span>
+                    <h4 className="font-heading text-2xl my-1 text-emerald-700">
+                      ₹{Math.round(totalRevenue * (1 - (seller.commissionRate || 10) / 100)).toLocaleString('en-IN')}
+                    </h4>
+                  </div>
+                </div>
               </div>
             )}
           </main>
         </div>
       </div>
 
-      <style>{`
-        @media (max-width: 992px) {
-          .seller-dashboard-layout { grid-template-columns: 1fr !important; }
-          .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; }
-        }
-      `}</style>
+      {/* EDIT PRODUCT MODAL */}
+      {editingProduct && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-white p-6 sm:p-8 rounded-md max-w-2xl w-full border border-gold/40 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
+              <div>
+                <h3 className="font-heading text-xl text-charcoal">Edit Jewellery Product</h3>
+                <p className="text-xs text-gray-500">Update item details, price, images, metal specs, and inventory stock.</p>
+              </div>
+              <button onClick={() => setEditingProduct(null)} className="p-1 text-gray-400 hover:text-charcoal">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditProductSubmit} className="flex flex-col gap-4">
+              {/* Previous Rejection Banner */}
+              {editingProduct.approvalStatus === 'Rejected' && (
+                <div className="p-4 bg-red-50 border-l-4 border-red-600 rounded-r text-xs text-red-900 space-y-1.5 shadow-sm">
+                  <div className="flex items-center justify-between font-bold text-sm">
+                    <span className="flex items-center gap-1.5 text-red-700">
+                      <AlertCircle size={16} /> Requires Revision (Rejected)
+                    </span>
+                    <span className="text-xs text-gray-500 font-mono">
+                      Rejected Date: {editingProduct.rejectedAt ? new Date(editingProduct.rejectedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent'}
+                    </span>
+                  </div>
+                  <div className="text-xs font-semibold">
+                    Admin Rejection Note:
+                    <span className="font-normal italic bg-white p-2 rounded border border-red-200 block mt-1 text-red-800 shadow-inner">
+                      "{editingProduct.rejectionReason || 'Please fix specs/images'}"
+                    </span>
+                  </div>
+                  <div className="text-[0.72rem] text-emerald-800 font-semibold pt-1 flex items-center gap-1">
+                    <CheckCircle2 size={14} /> Saving your edits below will automatically send this item back to Admin for Approval!
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Product Title / Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={editingProduct.name || ''}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                  className="input-field"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Selling Price (₹) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={editingProduct.price || ''}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value })}
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">MRP / Original Price (₹)</label>
+                  <input
+                    type="number"
+                    value={editingProduct.originalPrice || ''}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, originalPrice: e.target.value })}
+                    className="input-field"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Category</label>
+                  <select
+                    value={editingProduct.category || 'necklaces'}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value, categoryName: e.target.options[e.target.selectedIndex].text })}
+                    className="input-field capitalize"
+                  >
+                    <option value="necklaces">Necklaces</option>
+                    <option value="earrings">Earrings</option>
+                    <option value="rings">Rings</option>
+                    <option value="bangles">Bangles & Bracelets</option>
+                    <option value="bracelets">Bracelets</option>
+                    <option value="mangalsutra">Mangalsutra</option>
+                    <option value="pendants">Pendants</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Stock Quantity</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={editingProduct.stock || 1}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, stock: e.target.value })}
+                    className="input-field"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Metal Purity</label>
+                  <input
+                    type="text"
+                    value={editingProduct.metal || '22K Gold'}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, metal: e.target.value })}
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">BIS Hallmark / Purity Spec</label>
+                  <input
+                    type="text"
+                    value={editingProduct.purity || '22K BIS Hallmarked'}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, purity: e.target.value })}
+                    className="input-field"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Product Description</label>
+                <textarea
+                  rows="3"
+                  value={editingProduct.description || ''}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
+                  className="input-field text-xs"
+                />
+              </div>
+
+              {/* Primary Image Preview & Upload */}
+              <div className="bg-[#FAF6F0] p-4 border border-gray-200 rounded-sm">
+                <label className="text-xs font-semibold uppercase text-charcoal mb-2 block flex items-center justify-between">
+                  <span>Primary Product Image (Main View)</span>
+                  {editingProduct.image && <span className="text-[0.65rem] text-emerald-700 font-medium">✓ Image Attached</span>}
+                </label>
+
+                <div className="flex gap-4 items-start">
+                  {/* Live Thumbnail Preview */}
+                  <div
+                    className="w-24 h-24 rounded border border-gray-300 bg-white overflow-hidden flex items-center justify-center relative shrink-0 shadow-sm group cursor-pointer"
+                    title="Click to zoom primary image (Esc to close)"
+                    onClick={() =>
+                      editingProduct.image &&
+                      setPreviewModal({
+                        isOpen: true,
+                        images: [editingProduct.image, editingProduct.image2].filter(Boolean),
+                        initialIndex: 0,
+                        title: editingProduct.name || 'Primary Product Image'
+                      })
+                    }
+                  >
+                    {editingProduct.image ? (
+                      <>
+                        <img src={editingProduct.image} alt="Primary Preview" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <ZoomIn size={16} className="text-white" />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center p-2 text-gray-400">
+                        <Upload className="mx-auto mb-1" size={18} />
+                        <span className="text-[0.6rem]">No Image</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <label className="btn-gold py-1.5 px-3 text-xs cursor-pointer inline-flex items-center gap-1.5 shrink-0">
+                        <Upload size={14} /> Upload New Photo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files && e.target.files[0];
+                            if (file) {
+                              handleImageFileUpload(file, (url) => setEditingProduct((prev) => ({ ...prev, image: url })));
+                            }
+                          }}
+                        />
+                      </label>
+                      {editingProduct.image && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingProduct({ ...editingProduct, image: '' })}
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          Clear Image
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Image URL or Server Asset Path..."
+                      value={editingProduct.image || ''}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
+                      className="input-field text-xs text-gray-600 truncate bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Secondary Image Preview & Upload */}
+              <div className="bg-[#FAF6F0] p-4 border border-gray-200 rounded-sm">
+                <label className="text-xs font-semibold uppercase text-charcoal mb-2 block flex items-center justify-between">
+                  <span>Secondary Angle Photo (Hover / Back View)</span>
+                  {editingProduct.image2 && <span className="text-[0.65rem] text-emerald-700 font-medium">✓ Image Attached</span>}
+                </label>
+
+                <div className="flex gap-4 items-start">
+                  {/* Live Thumbnail Preview */}
+                  <div
+                    className="w-24 h-24 rounded border border-gray-300 bg-white overflow-hidden flex items-center justify-center relative shrink-0 shadow-sm group cursor-pointer"
+                    title="Click to zoom secondary image (Esc to close)"
+                    onClick={() =>
+                      editingProduct.image2 &&
+                      setPreviewModal({
+                        isOpen: true,
+                        images: [editingProduct.image, editingProduct.image2].filter(Boolean),
+                        initialIndex: editingProduct.image ? 1 : 0,
+                        title: editingProduct.name || 'Secondary Product Image'
+                      })
+                    }
+                  >
+                    {editingProduct.image2 ? (
+                      <>
+                        <img src={editingProduct.image2} alt="Secondary Preview" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <ZoomIn size={16} className="text-white" />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center p-2 text-gray-400">
+                        <Upload className="mx-auto mb-1" size={18} />
+                        <span className="text-[0.6rem]">Side / Back</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <label className="btn-gold py-1.5 px-3 text-xs cursor-pointer inline-flex items-center gap-1.5 shrink-0">
+                        <Upload size={14} /> Upload New Photo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files && e.target.files[0];
+                            if (file) {
+                              handleImageFileUpload(file, (url) => setEditingProduct((prev) => ({ ...prev, image2: url })));
+                            }
+                          }}
+                        />
+                      </label>
+                      {editingProduct.image2 && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingProduct({ ...editingProduct, image2: '' })}
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          Clear Image
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Secondary Image URL or Base64 string..."
+                      value={editingProduct.image2 || ''}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, image2: e.target.value })}
+                      className="input-field text-xs text-gray-600 truncate bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-4">
+                <button type="submit" className="btn-gold flex-1 py-3 text-xs">
+                  SAVE & UPDATE PRODUCT
+                </button>
+                <button type="button" onClick={() => setEditingProduct(null)} className="btn-outline py-3 px-5 text-xs">
+                  CANCEL
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Image Modal */}
+      <ImageModal
+        isOpen={previewModal.isOpen}
+        onClose={() => setPreviewModal((prev) => ({ ...prev, isOpen: false }))}
+        images={previewModal.images}
+        initialIndex={previewModal.initialIndex}
+        title={previewModal.title}
+      />
     </div>
   );
 }

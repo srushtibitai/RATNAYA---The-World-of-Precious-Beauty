@@ -3,84 +3,80 @@ import { Award, Store, ShieldCheck, Heart, Sparkles, ArrowRight } from 'lucide-r
 
 export function AboutPage({ onNavigateShop, onBecomeSeller }) {
   return (
-    <div style={{ backgroundColor: '#FAF6F0', paddingBottom: '100px' }}>
+    <div className="bg-[#FAF6F0] pb-24 min-h-[80vh]">
       {/* Banner */}
-      <div style={{ backgroundColor: '#111111', color: '#FFFFFF', padding: '80px 0', textAlign: 'center', borderBottom: '1px solid var(--color-border-gold)' }}>
-        <div className="container" style={{ maxWidth: '750px' }}>
-          <span className="eyebrow" style={{ color: '#C5A059' }}>OUR HERITAGE STORY</span>
-          <h1 style={{ fontSize: '3.2rem', color: '#FFFFFF', fontFamily: "'Marcellus', serif", margin: '12px 0 16px' }}>
+      <div className="bg-[#111111] text-white py-16 sm:py-24 text-center border-b border-gold/30">
+        <div className="container mx-auto px-4 sm:px-6 max-w-2xl">
+          <span className="eyebrow text-gold">OUR HERITAGE STORY</span>
+          <h1 className="font-heading text-3xl sm:text-5xl text-white my-3">
             "The World of Precious Beauty"
           </h1>
-          <p style={{ fontSize: '1.05rem', color: '#AAA', lineHeight: 1.8 }}>
+          <p className="text-sm sm:text-base text-gray-300 leading-relaxed font-light">
             Ratnaya is India’s premier multi-vendor luxury jewellery marketplace connecting discerning patrons with historic goldsmith ateliers, certified diamond creators, and independent artisans.
           </p>
         </div>
       </div>
 
-      <div className="container" style={{ paddingTop: '80px' }}>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16">
         {/* Section 1: Vision */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '60px', alignItems: 'center', marginBottom: '100px' }} className="about-grid">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center mb-16 sm:mb-24">
           <div>
             <span className="eyebrow">THE RATNAYA PURPOSE</span>
-            <h2 className="section-title">Elevating Indian Goldsmithing Traditions</h2>
-            <p style={{ fontSize: '1rem', color: 'var(--color-text-muted)', lineHeight: 1.8, marginBottom: '20px' }}>
+            <h2 className="section-title text-2xl sm:text-4xl">Elevating Indian Goldsmithing Traditions</h2>
+            <p className="text-sm sm:text-base text-gray-600 leading-relaxed mb-4 font-light">
               Founded with a passion for preserving ancient Jadau, Kundan, Meenakari, and filigree techniques, Ratnaya bridges the gap between legendary regional ateliers and modern luxury buyers nationwide.
             </p>
-            <p style={{ fontSize: '0.94rem', color: 'var(--color-text-main)', lineHeight: 1.8, marginBottom: '28px' }}>
+            <p className="text-sm sm:text-base text-charcoal leading-relaxed mb-6">
               Every creation displayed on our marketplace undergoes strict 6-digit HUID BIS hallmarking verification and certified gemstone authentication before reaching your doorstep in tamper-proof insured packaging.
             </p>
-            <button onClick={onNavigateShop} className="btn-gold">EXPLORE CATALOG <ArrowRight size={16} /></button>
+            <button onClick={onNavigateShop} className="btn-gold py-3 px-6 text-xs sm:text-sm">
+              EXPLORE CATALOG <ArrowRight size={16} />
+            </button>
           </div>
 
-          <div style={{ aspectRatio: '4/3', borderRadius: '4px', overflow: 'hidden', boxShadow: 'var(--shadow-medium)' }}>
-            <img src="/assets/jewellery/necklace/videoframe_3765.png" alt="Ratnaya Craftsmanship" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div className="aspect-[4/3] rounded-sm overflow-hidden shadow-medium border border-gray-200">
+            <img src="/assets/jewellery/necklace/videoframe_3765.png" alt="Ratnaya Craftsmanship" className="w-full h-full object-cover" />
           </div>
         </div>
 
         {/* Section 2: Values */}
-        <div style={{ backgroundColor: '#FFFFFF', padding: '60px 40px', borderRadius: '4px', border: '1px solid var(--color-border)', textAlign: 'center', marginBottom: '80px' }}>
-          <h2 className="section-title" style={{ marginBottom: '40px' }}>The Core Pillars of Ratnaya</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }} className="why-ratnaya-grid">
-            <div style={{ padding: '20px' }}>
-              <Award size={36} color="var(--color-gold-dark)" style={{ marginBottom: '12px' }} />
-              <h4 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>100% BIS Hallmarked</h4>
-              <p style={{ fontSize: '0.84rem', color: 'var(--color-text-muted)' }}>Guaranteed 22K (916) and 18K (750) purity with HUID tracking.</p>
+        <div className="bg-white p-8 sm:p-12 rounded-sm border border-gray-200 text-center mb-16 sm:mb-24 shadow-sm">
+          <h2 className="section-title text-2xl sm:text-4xl mb-8">The Core Pillars of Ratnaya</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="p-4">
+              <Award size={36} className="mx-auto text-gold-dark mb-3" />
+              <h4 className="text-base font-semibold mb-2">100% BIS Hallmarked</h4>
+              <p className="text-xs text-gray-500">Guaranteed 22K (916) and 18K (750) purity with HUID tracking.</p>
             </div>
-            <div style={{ padding: '20px' }}>
-              <Store size={36} color="var(--color-gold-dark)" style={{ marginBottom: '12px' }} />
-              <h4 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>Vetted Merchant Network</h4>
-              <p style={{ fontSize: '0.84rem', color: 'var(--color-text-muted)' }}>Empowering verified heritage goldsmiths from Jaipur, Mumbai, Kolkata & Hyderabad.</p>
+            <div className="p-4">
+              <Store size={36} className="mx-auto text-gold-dark mb-3" />
+              <h4 className="text-base font-semibold mb-2">Vetted Merchant Network</h4>
+              <p className="text-xs text-gray-500">Empowering verified heritage goldsmiths from Jaipur, Mumbai, Kolkata & Hyderabad.</p>
             </div>
-            <div style={{ padding: '20px' }}>
-              <ShieldCheck size={36} color="var(--color-gold-dark)" style={{ marginBottom: '12px' }} />
-              <h4 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>GIA & IGI Solitaires</h4>
-              <p style={{ fontSize: '0.84rem', color: 'var(--color-text-muted)' }}>Internationally certified natural diamonds and precious gemstones.</p>
+            <div className="p-4">
+              <ShieldCheck size={36} className="mx-auto text-gold-dark mb-3" />
+              <h4 className="text-base font-semibold mb-2">GIA & IGI Solitaires</h4>
+              <p className="text-xs text-gray-500">Internationally certified natural diamonds and precious gemstones.</p>
             </div>
-            <div style={{ padding: '20px' }}>
-              <Heart size={36} color="var(--color-gold-dark)" style={{ marginBottom: '12px' }} />
-              <h4 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>Transparent Marketplace</h4>
-              <p style={{ fontSize: '0.84rem', color: 'var(--color-text-muted)' }}>Direct merchant pricing, low making charges, and transparent buyback.</p>
+            <div className="p-4">
+              <Heart size={36} className="mx-auto text-gold-dark mb-3" />
+              <h4 className="text-base font-semibold mb-2">Transparent Marketplace</h4>
+              <p className="text-xs text-gray-500">Direct merchant pricing, low making charges, and transparent buyback.</p>
             </div>
           </div>
         </div>
 
         {/* Section 3: Merchant CTA */}
-        <div style={{ backgroundColor: '#111111', color: '#FFFFFF', padding: '60px 40px', borderRadius: '4px', textAlign: 'center', border: '1px solid var(--color-border-gold)' }}>
-          <h2 style={{ fontSize: '2.2rem', fontFamily: "'Marcellus', serif", marginBottom: '16px', color: '#FFF' }}>
+        <div className="bg-[#111111] text-white p-8 sm:p-14 rounded-sm text-center border border-gold/30">
+          <h2 className="font-heading text-2xl sm:text-4xl mb-3 text-white">
             Are You a Heritage Jeweller or Diamond Atelier?
           </h2>
-          <p style={{ fontSize: '1rem', color: '#CCC', maxWidth: '600px', margin: '0 auto 28px' }}>
+          <p className="text-xs sm:text-sm text-gray-300 max-w-lg mx-auto mb-6 font-light">
             Join the Ratnaya merchant family to list your hallmarked creations to luxury buyers across India.
           </p>
-          <button onClick={onBecomeSeller} className="btn-gold" style={{ padding: '16px 36px' }}>BECOME A RATNAYA SELLER</button>
+          <button onClick={onBecomeSeller} className="btn-gold py-3.5 px-8 text-xs font-semibold">BECOME A RATNAYA SELLER</button>
         </div>
       </div>
-
-      <style>{`
-        @media (max-width: 992px) {
-          .about-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
     </div>
   );
 }

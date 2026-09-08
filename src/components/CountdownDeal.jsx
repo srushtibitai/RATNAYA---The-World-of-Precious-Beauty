@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { ArrowRight, Clock, Sparkles } from 'lucide-react';
 
 export function CountdownDeal({ onNavigateShop }) {
-  // 4 days countdown target
   const [timeLeft, setTimeLeft] = useState({
     days: 4,
     hours: 18,
@@ -30,79 +29,31 @@ export function CountdownDeal({ onNavigateShop }) {
   }, []);
 
   return (
-    <section
-      style={{
-        padding: '100px 0',
-        backgroundColor: '#111111',
-        color: '#FFFFFF',
-        position: 'relative',
-        overflow: 'hidden'
-      }}
-    >
+    <section className="py-16 sm:py-24 bg-[#111111] text-white relative overflow-hidden">
       <div
+        className="absolute inset-0 bg-cover bg-center opacity-30"
         style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundImage: `url('https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&q=80&w=2000')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          opacity: 0.3
+          backgroundImage: `url('https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&q=80&w=2000')`
         }}
       />
 
-      <div className="container" style={{ position: 'relative', zIndex: 10 }}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '60px',
-            alignItems: 'center'
-          }}
-          className="deal-grid"
-        >
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           <div>
-            <span
-              style={{
-                fontSize: '0.78rem',
-                letterSpacing: '0.25em',
-                textTransform: 'uppercase',
-                color: '#C5A059',
-                fontWeight: '600',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '16px'
-              }}
-            >
+            <span className="text-xs sm:text-sm tracking-[0.25em] uppercase text-gold font-semibold flex items-center gap-2 mb-3">
               <Clock size={16} /> EXCLUSIVE FESTIVE OFFER
             </span>
 
-            <h2
-              style={{
-                fontSize: '3rem',
-                color: '#FFFFFF',
-                fontFamily: "'Marcellus', serif",
-                lineHeight: 1.2,
-                marginBottom: '20px'
-              }}
-            >
+            <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl text-white leading-tight mb-4 font-normal">
               Hurry, Deals End Soon
             </h2>
 
-            <p style={{ fontSize: '1.05rem', color: '#DDD', lineHeight: 1.7, marginBottom: '36px', fontWeight: '300' }}>
+            <p className="text-sm sm:text-base text-gray-300 leading-relaxed mb-8 font-light max-w-lg">
               Enjoy complimentary certified diamond upgrade and zero making charges on select 22K Kundan bridal sets.
             </p>
 
             {/* Countdown Box Grid */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: '16px',
-                maxWidth: '440px',
-                marginBottom: '40px'
-              }}
-            >
+            <div className="grid grid-cols-4 gap-3 sm:gap-4 max-w-md mb-8">
               {[
                 { label: 'DAYS', val: String(timeLeft.days).padStart(2, '0') },
                 { label: 'HOURS', val: String(timeLeft.hours).padStart(2, '0') },
@@ -111,47 +62,34 @@ export function CountdownDeal({ onNavigateShop }) {
               ].map((item, idx) => (
                 <div
                   key={idx}
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(197, 160, 89, 0.4)',
-                    padding: '16px 8px',
-                    borderRadius: '4px',
-                    textAlign: 'center'
-                  }}
+                  className="bg-white/10 backdrop-blur-md border border-gold/40 p-3 sm:p-4 rounded-sm text-center"
                 >
-                  <div style={{ fontSize: '2rem', fontFamily: "'Marcellus', serif", color: '#E5C888', fontWeight: '400', lineHeight: 1 }}>
+                  <div className="font-heading text-xl sm:text-3xl text-[#E5C888] font-normal leading-none mb-1">
                     {item.val}
                   </div>
-                  <div style={{ fontSize: '0.68rem', letterSpacing: '0.15em', color: '#AAA', marginTop: '6px' }}>
+                  <div className="text-[0.62rem] sm:text-xs tracking-widest text-gray-400">
                     {item.label}
                   </div>
                 </div>
               ))}
             </div>
 
-            <button onClick={onNavigateShop} className="btn-gold" style={{ padding: '16px 40px' }}>
+            <button onClick={onNavigateShop} className="btn-gold py-3.5 px-8 text-xs sm:text-sm">
               SHOP NOW <ArrowRight size={16} />
             </button>
           </div>
 
-          <div style={{ position: 'relative' }}>
-            <div style={{ aspectRatio: '1/1', borderRadius: '4px', overflow: 'hidden', border: '1px solid rgba(197, 160, 89, 0.4)' }}>
+          <div className="relative">
+            <div className="aspect-square rounded-sm overflow-hidden border border-gold/40 shadow-2xl max-w-md mx-auto">
               <img
                 src="/assets/jewellery/necklace/8.jpg"
                 alt="Limited Festive Deal"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                className="w-full h-full object-cover"
               />
             </div>
           </div>
         </div>
       </div>
-
-      <style>{`
-        @media (max-width: 992px) {
-          .deal-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
     </section>
   );
 }

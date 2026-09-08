@@ -40,7 +40,7 @@ export function Logo({
   showTagline = false,
   variant = 'dark', // 'dark' or 'light' (for dark footer background)
   size = 'medium',
-  className = 'ps-10',
+  className = '',
   onClick
 }) {
   const emblemSize = size === 'large' ? 44 : size === 'small' ? 26 : 34;
@@ -65,9 +65,9 @@ export function Logo({
           <span
             style={{
               fontFamily: "'Marcellus', serif",
-              fontSize: size === 'large' ? '1.8rem' : size === 'small' ? '1.15rem' : '1.45rem',
+              fontSize: size === 'large' ? '1.7rem' : size === 'small' ? '1.05rem' : '1.28rem',
               fontWeight: '600',
-              letterSpacing: '0.22em',
+              letterSpacing: '0.18em',
               color: textColor,
               lineHeight: 1
             }}
@@ -76,14 +76,16 @@ export function Logo({
           </span>
           {showTagline && (
             <span
+              className="hidden sm:block"
               style={{
                 fontFamily: "'Outfit', sans-serif",
-                fontSize: size === 'large' ? '0.72rem' : '0.65rem',
-                letterSpacing: '0.18em',
+                fontSize: size === 'large' ? '0.68rem' : '0.58rem',
+                letterSpacing: '0.12em',
                 textTransform: 'uppercase',
                 color: taglineColor,
-                marginTop: '4px',
-                fontWeight: '500'
+                marginTop: '3px',
+                fontWeight: '500',
+                whiteSpace: 'nowrap'
               }}
             >
               The World of Precious Beauty

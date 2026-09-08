@@ -6,7 +6,7 @@ const VIDEO_CATEGORIES = [
     title: 'Earrings',
     itemCount: '80+ items',
     video: '/assets/jewellery/video/From Klickpin.com- Money Saving Tips Inspiration for Everyday 18207-pin-id-982136631248328968.mp4',
-
+    poster: '/assets/jewellery/earring/1.jpg',
     description: 'Handcrafted Kundan droplets and diamond chandelier earrings tailored for royal moments.'
   },
   {
@@ -14,6 +14,7 @@ const VIDEO_CATEGORIES = [
     title: 'Rings',
     itemCount: '120+ items',
     video: '/assets/jewellery/video/From Klickpin.com- Elegant entryway organization ideas that are perfect when you want something stylish modern and easy to copy for anyone who lov.mp4',
+    poster: '/assets/jewellery/ring/1.jpg',
     description: 'Bespoke 22K gold Jadau foil setting and GIA certified solitaire creations reflecting your unique story.'
   },
   {
@@ -21,42 +22,26 @@ const VIDEO_CATEGORIES = [
     title: 'Bracelets',
     itemCount: '60+ items',
     video: '/assets/jewellery/video/From Klickpin.com- From beginner to obsessed Build these beautiful goal setting ideas that help you get the look without the stress with smart ste.mp4',
-    description: 'Torquent Natoque Per Cursus Dui Condimentum Nec Vestibulum Tortor. Pulvinar Euismod Ad Diam Molestie Consectetur Parturient Omare. Id Nibh Sit Euismod Volutpat Ligula Tristique.'
+    poster: '/assets/jewellery/bracelet/1.jpg',
+    description: 'Continuous 18K rose gold tennis diamond strands and filigree bangles crafted for luxury.'
   },
   {
     id: 'pendants',
     title: 'Pendants',
     itemCount: '90+ items',
-
     video: '/assets/jewellery/video/From Klickpin.com- Polished Bridal Shower Ideas Worth Trying 5047-pin-id-858146904041441263.mp4',
-
+    poster: '/assets/jewellery/pendant/1.jpg',
     description: 'Exquisite diamond & emerald pendants designed to illuminate every celebration with distinctive grace.'
   }
 ];
 
 export function JewelleryVideoAccordionSection({ onSelectCategory, onNavigateShop }) {
-  // Active column index (default to 2: Bracelets, matching reference screenshot)
-  const [activeIdx, setActiveIdx] = useState(2);
+  // Active column index (default to 1: Rings)
+  const [activeIdx, setActiveIdx] = useState(1);
 
   return (
-    <section
-      style={{
-        position: 'relative',
-        width: '100%',
-        height: '620px',
-        backgroundColor: '#111111',
-        overflow: 'hidden'
-      }}
-      className="swarna-video-accordion-section"
-    >
-      <div
-        style={{
-          display: 'flex',
-          width: '100%',
-          height: '100%'
-        }}
-        className="accordion-container"
-      >
+    <section className="relative w-full h-auto md:h-[620px] bg-[#111111] overflow-hidden block">
+      <div className="flex flex-col md:flex-row w-full h-full min-h-[880px] md:min-h-0">
         {VIDEO_CATEGORIES.map((cat, idx) => {
           const isActive = activeIdx === idx;
 
@@ -65,17 +50,17 @@ export function JewelleryVideoAccordionSection({ onSelectCategory, onNavigateSho
               key={cat.id}
               onMouseEnter={() => setActiveIdx(idx)}
               onClick={() => onSelectCategory ? onSelectCategory(cat.id) : (onNavigateShop && onNavigateShop())}
-              style={{
-                flex: isActive ? '2.2' : '1',
-                position: 'relative',
-                height: '100%',
-                overflow: 'hidden',
-                cursor: 'pointer',
-                transition: 'flex 0.6s cubic-bezier(0.25, 1, 0.5, 1)',
-                borderRight: idx < VIDEO_CATEGORIES.length - 1 ? '1px solid rgba(255, 255, 255, 0.15)' : 'none'
-              }}
-              className={`accordion-column ${isActive ? 'active' : ''}`}
+              className={`relative min-h-[220px] sm:min-h-[280px] md:min-h-0 h-[220px] sm:h-[280px] md:h-full overflow-hidden cursor-pointer transition-all duration-500 border-b md:border-b-0 md:border-r border-white/20 ${
+                isActive ? 'md:flex-[2.2] flex-1' : 'md:flex-1 flex-1'
+              }`}
             >
+              {/* Background Poster Image Fallback */}
+              <img
+                src={cat.poster}
+                alt={cat.title}
+                className="absolute inset-0 w-full h-full object-cover object-center -z-10 transition-transform duration-700 ease-out group-hover:scale-105"
+              />
+
               {/* Background Video */}
               <video
                 src={cat.video}
@@ -83,80 +68,30 @@ export function JewelleryVideoAccordionSection({ onSelectCategory, onNavigateSho
                 loop
                 muted
                 playsInline
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  objectPosition: 'center',
-                  filter: isActive ? 'brightness(0.75) contrast(1.05)' : 'brightness(0.45) grayscale(0.2)',
-                  transition: 'filter 0.6s ease, transform 0.6s ease',
-                  transform: isActive ? 'scale(1.03)' : 'scale(1)'
-                }}
+                preload="metadata"
+                className={`absolute inset-0 w-full h-full object-cover object-center transition-all duration-600 ${
+                  isActive ? 'brightness-75 contrast-105 scale-105' : 'brightness-50 grayscale-20 scale-100'
+                }`}
               />
 
               {/* Dark Overlay Gradient */}
               <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: isActive
-                    ? 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.3) 100%)'
-                    : 'rgba(0, 0, 0, 0.45)',
-                  transition: 'background 0.6s ease'
-                }}
+                className={`absolute inset-0 transition-colors duration-600 ${
+                  isActive
+                    ? 'bg-gradient-to-t from-black/85 via-black/45 to-black/35'
+                    : 'bg-black/60'
+                }`}
               />
 
-              {/* Column Content */}
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: isActive ? 'center' : 'flex-end',
-                  padding: isActive ? '40px 30px' : '0 0 60px 0',
-                  color: '#FFFFFF',
-                  textAlign: 'center',
-                  zIndex: 10,
-                  transition: 'all 0.6s cubic-bezier(0.25, 1, 0.5, 1)'
-                }}
-              >
+              {/* Column Content - ALL TEXT GUARANTEED PURE BRIGHT WHITE */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-4 sm:p-6 text-center z-10">
                 {isActive ? (
-                  /* Active Column Layout: Oval Title Badge + Description + Subtext */
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      maxWidth: '380px',
-                      animation: 'fadeInUp 0.5s ease'
-                    }}
-                  >
+                  <div className="flex flex-col items-center max-w-sm animate-fadeInUp">
                     {/* Oval Badge with Title */}
-                    <div
-                      style={{
-                        padding: '12px 36px',
-                        borderRadius: '50px',
-                        border: '1px solid rgba(255, 255, 255, 0.75)',
-                        backgroundColor: 'rgba(0, 0, 0, 0.25)',
-                        backdropFilter: 'blur(4px)',
-                        marginBottom: '28px',
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
-                      }}
-                    >
+                    <div className="py-2 sm:py-2.5 px-6 sm:px-8 rounded-full border border-white/90 bg-black/50 backdrop-blur-md mb-3 sm:mb-4 shadow-xl">
                       <h3
-                        style={{
-                          fontFamily: "'Marcellus', serif",
-                          fontSize: '2rem',
-                          color: '#FFFFFF',
-                          margin: 0,
-                          fontWeight: '400',
-                          letterSpacing: '0.04em'
-                        }}
+                        className="font-heading text-lg sm:text-2xl font-normal tracking-wide"
+                        style={{ color: '#FFFFFF' }}
                       >
                         {cat.title}
                       </h3>
@@ -164,63 +99,41 @@ export function JewelleryVideoAccordionSection({ onSelectCategory, onNavigateSho
 
                     {/* Editorial Description Text */}
                     <p
-                      style={{
-                        fontFamily: "'Marcellus', serif",
-                        fontSize: '0.88rem',
-                        lineHeight: 1.7,
-                        color: 'rgba(255, 255, 255, 0.9)',
-                        marginBottom: '24px',
-                        fontWeight: '300',
-                        textAlign: 'center'
-                      }}
+                      className="font-sans text-xs sm:text-sm leading-relaxed mb-2 sm:mb-3 font-light line-clamp-3 sm:line-clamp-none px-2"
+                      style={{ color: '#FFFFFF' }}
                     >
                       {cat.description}
                     </p>
 
                     {/* Sub-caption */}
                     <span
-                      style={{
-                        fontFamily: "'Outfit', sans-serif",
-                        fontSize: '0.82rem',
-                        color: 'rgba(255, 255, 255, 0.8)',
-                        letterSpacing: '0.08em'
-                      }}
+                      className="font-sans text-[0.7rem] sm:text-xs tracking-wider font-medium"
+                      style={{ color: 'rgba(255, 255, 255, 0.95)' }}
                     >
-                      ( Explore {cat.itemCount} )
+                      {cat.itemCount} — Explore Category →
                     </span>
                   </div>
                 ) : (
-                  /* Resting Column Layout: Clean Vertical/Bottom Category Title */
-                  <h3
-                    style={{
-                      fontFamily: "'Marcellus', serif",
-                      fontSize: '2.2rem',
-                      color: '#FFFFFF',
-                      margin: 0,
-                      fontWeight: '400',
-                      letterSpacing: '0.03em'
-                    }}
-                  >
-                    {cat.title}
-                  </h3>
+                  <div className="flex flex-col items-center">
+                    <h3
+                      className="font-heading text-lg sm:text-xl font-normal tracking-widest uppercase mb-1"
+                      style={{ color: '#FFFFFF' }}
+                    >
+                      {cat.title}
+                    </h3>
+                    <span
+                      className="font-sans text-[0.65rem] sm:text-xs tracking-wider uppercase"
+                      style={{ color: 'rgba(255, 255, 255, 0.85)' }}
+                    >
+                      {cat.itemCount}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
           );
         })}
       </div>
-
-      <style>{`
-        @keyframes fadeInUp {
-          0% { opacity: 0; transform: translateY(12px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        @media (max-width: 992px) {
-          .swarna-video-accordion-section { height: auto !important; }
-          .accordion-container { flex-direction: column !important; }
-          .accordion-column { height: 320px !important; flex: 1 !important; }
-        }
-      `}</style>
     </section>
   );
 }

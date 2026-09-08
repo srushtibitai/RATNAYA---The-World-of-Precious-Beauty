@@ -21,71 +21,48 @@ export function SellerStorePage({
   });
 
   return (
-    <div style={{ backgroundColor: '#FAF6F0', paddingBottom: '100px', minHeight: '80vh' }}>
+    <div className="bg-[#FAF6F0] pb-24 min-h-[80vh]">
       {/* Seller Header Hero Banner */}
       <div
-        style={{
-          position: 'relative',
-          height: '240px',
-          backgroundImage: `url(${seller.banner})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center'
-        }}
+        className="relative h-48 sm:h-64 bg-cover bg-center"
+        style={{ backgroundImage: `url(${seller.banner})` }}
       >
-        <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(17, 17, 17, 0.65)' }} />
+        <div className="absolute inset-0 bg-black/65" />
       </div>
 
-      <div className="container" style={{ marginTop: '-70px', position: 'relative', zIndex: 10 }}>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-10">
         {/* Seller Info Header Card */}
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid var(--color-border-gold)',
-            borderRadius: '4px',
-            padding: '32px',
-            boxShadow: 'var(--shadow-medium)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '24px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+        <div className="bg-white border border-gold/40 rounded-sm p-6 sm:p-8 shadow-medium flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
             <img
               src={seller.logo}
               alt={seller.name}
-              style={{
-                width: '100px',
-                height: '100px',
-                borderRadius: '50%',
-                objectFit: 'cover',
-                border: '3px solid #FFFFFF',
-                boxShadow: '0 4px 14px rgba(0,0,0,0.15)'
-              }}
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-white shadow-md shrink-0"
             />
 
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <h1 style={{ fontSize: '1.8rem', fontFamily: "'Marcellus', serif" }}>{seller.name}</h1>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="font-heading text-2xl sm:text-3xl text-charcoal">{seller.name}</h1>
                 {seller.verified && (
-                  <span className="badge-gold" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheck size={12} color="var(--color-gold-dark)" /> Verified Jeweller
+                  <span className="badge-gold text-xs flex items-center gap-1">
+                    <ShieldCheck size={12} className="text-gold-dark" /> Verified Jeweller
                   </span>
                 )}
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '18px', marginTop: '6px', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div className="flex items-center gap-4 mt-2 text-xs sm:text-sm text-gray-500 flex-wrap">
+                <span className="flex items-center gap-1">
                   <MapPin size={14} /> {seller.city}
                 </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#D4AF37', fontWeight: '600' }}>
-                  <Star size={14} fill="#D4AF37" /> {seller.rating} ({seller.reviewsCount} reviews)
+                <span className="flex items-center gap-1 text-amber-500 font-semibold">
+                  <Star size={14} fill="currentColor" /> {seller.rating} ({seller.reviewsCount} reviews)
                 </span>
-                <span>{seller.productsCount} Total Pieces</span>
+                <span className="flex items-center gap-1">
+                  <Calendar size={14} /> Member since {seller.joinedDate}
+                </span>
               </div>
 
-              <p style={{ fontSize: '0.88rem', color: 'var(--color-text-main)', marginTop: '10px', maxWidth: '600px' }}>
+              <p className="text-xs sm:text-sm text-gray-600 mt-2 max-w-xl">
                 {seller.about}
               </p>
             </div>
@@ -93,94 +70,118 @@ export function SellerStorePage({
 
           <button
             onClick={() => setIsFollowing(!isFollowing)}
-            className={isFollowing ? 'btn-outline' : 'btn-gold'}
-            style={{ padding: '12px 28px' }}
+            className={`py-2.5 px-6 text-xs font-semibold uppercase tracking-wider rounded-sm transition-all border-none cursor-pointer ${
+              isFollowing
+                ? 'bg-emerald-800 text-white'
+                : 'btn-gold'
+            }`}
           >
-            {isFollowing ? <><Check size={16} /> Following Store</> : <><Store size={16} /> Follow Store</>}
+            {isFollowing ? '✓ Following Jeweller' : '+ Follow Merchant'}
           </button>
         </div>
 
-        {/* Store Tabs */}
-        <div style={{ marginTop: '40px', display: 'flex', gap: '16px', borderBottom: '1px solid var(--color-border)' }}>
-          {[
-            { id: 'all', label: `All Pieces (${sellerProducts.length})` },
-            { id: 'necklaces', label: 'Necklaces' },
-            { id: 'rings', label: 'Rings' },
-            { id: 'bangles', label: 'Bangles & Bracelets' },
-            { id: 'reviews', label: `Store Reviews (${seller.reviewsCount})` }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '12px 24px',
-                fontSize: '0.86rem',
-                fontFamily: "'Outfit', sans-serif",
-                fontWeight: activeTab === tab.id ? '600' : '400',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                color: activeTab === tab.id ? 'var(--color-gold-dark)' : 'var(--color-charcoal)',
-                borderBottom: activeTab === tab.id ? '2px solid var(--color-gold)' : 'none'
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Store Catalogue Grid */}
+        <div className="mt-10">
+          <div className="flex items-center justify-between border-b border-gray-200 pb-3 mb-6">
+            <h2 className="font-heading text-xl sm:text-2xl">
+              Merchant Catalogue ({displayedProducts.length})
+            </h2>
 
-        {/* Store Products Grid */}
-        <div style={{ paddingTop: '32px' }}>
-          {activeTab === 'reviews' ? (
-            <div style={{ backgroundColor: '#FFFFFF', padding: '32px', border: '1px solid var(--color-border)', borderRadius: '4px' }}>
-              <h3 style={{ fontSize: '1.4rem', fontFamily: "'Marcellus', serif", marginBottom: '20px' }}>
-                Verified Buyer Reviews for {seller.name}
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {[
-                  { name: 'Ananya S.', date: 'August 2026', comment: 'Authentic 22K Kundan work! Packaging was top-notch and delivery came within 3 days.' },
-                  { name: 'Rajesh K.', date: 'July 2026', comment: 'Bought diamond solitaire engagement ring. GIA certificate matched perfectly.' }
-                ].map((r, idx) => (
-                  <div key={idx} style={{ padding: '16px', borderBottom: '1px solid var(--color-border)' }}>
-                    <div style={{ display: 'flex', color: '#D4AF37', marginBottom: '4px' }}>
-                      {[...Array(5)].map((_, i) => <Star key={i} size={14} fill="#D4AF37" stroke="#D4AF37" />)}
-                    </div>
-                    <p style={{ fontSize: '0.9rem', color: 'var(--color-text-main)' }}>"{r.comment}"</p>
-                    <div style={{ fontSize: '0.78rem', color: '#888', marginTop: '6px' }}>{r.name} — {r.date}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="grid-4">
-              {displayedProducts.map((prod) => (
-                <div key={prod.id} className="product-card">
-                  <div className="product-image-wrap">
-                    <img src={prod.images ? prod.images[0] : prod.image} alt={prod.name} className="product-image-primary" />
-                    <button
-                      onClick={() => onToggleWishlist(prod)}
-                      className={`wishlist-btn ${wishlistIds.includes(prod.id) ? 'active' : ''}`}
-                    >
-                      <Heart size={18} fill={wishlistIds.includes(prod.id) ? '#D93838' : 'none'} color={wishlistIds.includes(prod.id) ? '#D93838' : '#111'} />
-                    </button>
-                    <div className="product-actions-overlay">
-                      <button onClick={() => onQuickView(prod)} className="btn-outline" style={{ flex: 1, backgroundColor: '#FFF', padding: '8px', fontSize: '0.72rem' }}>
-                        <Eye size={14} /> Quick View
-                      </button>
-                      <button onClick={() => onAddToCart(prod)} className="btn-gold" style={{ flex: 1, padding: '8px', fontSize: '0.72rem' }}>
-                        <ShoppingBag size={14} /> Add to Cart
-                      </button>
-                    </div>
-                  </div>
-                  <div style={{ padding: '16px' }}>
-                    <h3 onClick={() => onSelectProduct(prod)} style={{ fontSize: '0.96rem', fontWeight: '400', cursor: 'pointer', marginBottom: '6px' }}>
-                      {prod.name}
-                    </h3>
-                    <div style={{ fontWeight: '600' }}>₹{prod.price.toLocaleString('en-IN')}</div>
-                  </div>
-                </div>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar">
+              {['all', 'necklaces', 'rings', 'bracelets', 'earrings'].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveTab(cat)}
+                  className={`px-3.5 py-1.5 text-xs uppercase tracking-wider rounded-full transition-colors cursor-pointer border-none ${
+                    activeTab === cat
+                      ? 'bg-gold text-white font-semibold'
+                      : 'bg-white text-gray-600 hover:text-charcoal'
+                  }`}
+                >
+                  {cat}
+                </button>
               ))}
             </div>
-          )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {displayedProducts.map((prod) => (
+              <div
+                key={prod.id}
+                className="product-card group rounded-sm bg-white border border-gray-200 overflow-hidden flex flex-col justify-between transition-all duration-300 hover:shadow-medium hover:border-gold/50"
+              >
+                <div className="product-image-wrap relative aspect-[1/1.15] overflow-hidden bg-[#FAF8F5]">
+                  <img
+                    src={prod.images ? prod.images[0] : prod.image}
+                    alt={prod.name}
+                    className="product-image-primary w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                  />
+                  {/* Wishlist Heart Icon (Top-Right) */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleWishlist(prod);
+                    }}
+                    className={`wishlist-btn absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center transition-all z-10 shadow-sm border-none cursor-pointer hover:scale-105 ${
+                      wishlistIds.includes(prod.id) ? 'text-red-500 bg-white' : 'text-charcoal hover:text-red-500'
+                    }`}
+                    title="Wishlist"
+                  >
+                    <Heart
+                      size={18}
+                      fill={wishlistIds.includes(prod.id) ? '#D93838' : 'none'}
+                      stroke={wishlistIds.includes(prod.id) ? '#D93838' : 'currentColor'}
+                      strokeWidth={wishlistIds.includes(prod.id) ? 0 : 1.75}
+                    />
+                  </button>
+
+                  {/* Bottom Floating Glassmorphism Action Pill on Hover */}
+                  <div className="absolute inset-x-0 bottom-4 flex justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 pointer-events-none">
+                    <div className="flex items-center gap-3 bg-black/85 backdrop-blur-md px-4 py-2 rounded-full text-white shadow-2xl pointer-events-auto transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onQuickView(prod);
+                        }}
+                        className="flex items-center gap-1.5 text-xs font-medium text-white hover:text-gold transition-colors bg-transparent border-none cursor-pointer whitespace-nowrap"
+                        title="Quick View"
+                      >
+                        <Eye size={14} /> <span>Quick View</span>
+                      </button>
+                      <span className="text-white/30 font-light select-none">|</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddToCart(prod);
+                        }}
+                        className="flex items-center gap-1.5 text-xs font-medium text-white hover:text-gold transition-colors bg-transparent border-none cursor-pointer whitespace-nowrap"
+                        title="Add to Cart"
+                      >
+                        <ShoppingBag size={14} /> <span>Add to Cart</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 flex flex-col flex-1 justify-between gap-2">
+                  <div>
+                    <h3
+                      onClick={() => onSelectProduct(prod)}
+                      className="text-sm font-normal text-charcoal hover:text-gold cursor-pointer line-clamp-2 leading-snug"
+                    >
+                      {prod.name}
+                    </h3>
+                  </div>
+
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-base font-semibold text-charcoal">
+                      ₹{prod.price.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

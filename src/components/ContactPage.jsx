@@ -11,55 +11,55 @@ export function ContactPage() {
   };
 
   return (
-    <div style={{ backgroundColor: '#FAF6F0', paddingBottom: '100px' }}>
+    <div className="bg-[#FAF6F0] pb-24 min-h-[80vh]">
       {/* Banner */}
-      <div style={{ backgroundColor: '#111111', color: '#FFFFFF', padding: '60px 0', textAlign: 'center', borderBottom: '1px solid var(--color-border-gold)' }}>
-        <div className="container">
-          <div style={{ fontSize: '0.78rem', color: '#C5A059', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: '8px' }}>
+      <div className="bg-[#111111] text-white py-12 sm:py-16 text-center border-b border-gold/30">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="text-xs text-gold tracking-widest uppercase mb-2">
             Home / Contact Us
           </div>
-          <h1 style={{ fontSize: '2.8rem', color: '#FFFFFF', fontFamily: "'Marcellus', serif" }}>
+          <h1 className="font-heading text-3xl sm:text-5xl text-white">
             We Are At Your Service
           </h1>
-          <p style={{ fontSize: '0.95rem', color: '#AAA', maxWidth: '540px', margin: '12px auto 0' }}>
+          <p className="text-xs sm:text-sm text-gray-400 max-w-md mx-auto mt-3 font-light">
             Our royal concierge team and gemologists are available to assist with bespoke orders and inquiries.
           </p>
         </div>
       </div>
 
-      <div className="container" style={{ paddingTop: '60px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '50px' }} className="contact-grid">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           {/* Contact Form */}
-          <div style={{ backgroundColor: '#FFFFFF', padding: '36px', borderRadius: '4px', border: '1px solid var(--color-border)' }}>
-            <h3 style={{ fontSize: '1.4rem', fontFamily: "'Marcellus', serif", marginBottom: '20px' }}>Send Us a Message</h3>
+          <div className="bg-white p-6 sm:p-10 rounded-sm border border-gray-200 shadow-sm">
+            <h3 className="font-heading text-xl sm:text-2xl mb-6">Send Us a Message</h3>
 
             {submitted ? (
-              <div style={{ backgroundColor: '#E6F4EA', color: '#137333', padding: '20px', borderRadius: '4px', textAlign: 'center' }}>
-                <CheckCircle2 size={32} style={{ marginBottom: '8px' }} />
-                <h4 style={{ fontSize: '1.1rem', margin: '4px 0' }}>Thank You for Reaching Out</h4>
-                <p style={{ fontSize: '0.86rem' }}>Our Ratnaya concierge will contact you within 2 business hours.</p>
+              <div className="bg-emerald-50 text-emerald-800 p-6 rounded-sm text-center border border-emerald-200">
+                <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-700" />
+                <h4 className="font-heading text-lg my-1">Thank You for Reaching Out</h4>
+                <p className="text-xs sm:text-sm">Our Ratnaya concierge will contact you within 2 business hours.</p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div>
-                  <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#666' }}>Full Name *</label>
+                  <label className="text-xs uppercase font-semibold text-gray-500 mb-1 block">Full Name *</label>
                   <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#666' }}>Email Address *</label>
+                    <label className="text-xs uppercase font-semibold text-gray-500 mb-1 block">Email Address *</label>
                     <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#666' }}>Phone Number *</label>
+                    <label className="text-xs uppercase font-semibold text-gray-500 mb-1 block">Phone Number *</label>
                     <input type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input-field" />
                   </div>
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#666' }}>Your Inquiry / Message *</label>
+                  <label className="text-xs uppercase font-semibold text-gray-500 mb-1 block">Your Inquiry / Message *</label>
                   <textarea rows={5} required value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="input-field" />
                 </div>
-                <button type="submit" className="btn-gold" style={{ padding: '14px' }}>
+                <button type="submit" className="btn-gold py-3.5 text-xs font-semibold flex items-center justify-center gap-2">
                   <Send size={16} /> SEND MESSAGE
                 </button>
               </form>
@@ -67,61 +67,42 @@ export function ContactPage() {
           </div>
 
           {/* Contact Cards & Info */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ backgroundColor: '#FFFFFF', padding: '24px', border: '1px solid var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'var(--bg-tertiary)', color: 'var(--color-gold-dark)', display: 'flex', alignItems: 'center', justifyCenter: 'center', flexShrink: 0 }}>
+          <div className="flex flex-col gap-4">
+            <div className="bg-white p-6 border border-gray-200 rounded-sm flex items-center gap-4 shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-[#F5E7D6] text-gold-dark flex items-center justify-center shrink-0">
                 <Phone size={20} />
               </div>
               <div>
-                <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: '#777' }}>Direct Concierge Hotline</h5>
-                <div style={{ fontSize: '1.05rem', fontWeight: '600', color: 'var(--color-charcoal)' }}>+91 1800 266 8899</div>
-                <span style={{ fontSize: '0.75rem', color: '#888' }}>Toll Free Across India (10 AM - 8 PM IST)</span>
+                <h5 className="text-xs uppercase text-gray-500 font-medium">Direct Concierge Hotline</h5>
+                <div className="text-base sm:text-lg font-semibold text-charcoal">+91 1800 266 8899</div>
+                <span className="text-xs text-gray-400">Toll Free Across India (10 AM - 8 PM IST)</span>
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#FFFFFF', padding: '24px', border: '1px solid var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'var(--bg-tertiary)', color: 'var(--color-gold-dark)', display: 'flex', alignItems: 'center', justifyCenter: 'center', flexShrink: 0 }}>
+            <div className="bg-white p-6 border border-gray-200 rounded-sm flex items-center gap-4 shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-[#F5E7D6] text-gold-dark flex items-center justify-center shrink-0">
                 <Mail size={20} />
               </div>
               <div>
-                <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: '#777' }}>Support & Merchant Desk</h5>
-                <div style={{ fontSize: '1.05rem', fontWeight: '600', color: 'var(--color-charcoal)' }}>concierge@ratnaya.com</div>
-                <span style={{ fontSize: '0.75rem', color: '#888' }}>Average response time: 2 hours</span>
+                <h5 className="text-xs uppercase text-gray-500 font-medium">Support & Merchant Desk</h5>
+                <div className="text-base sm:text-lg font-semibold text-charcoal">concierge@ratnaya.com</div>
+                <span className="text-xs text-gray-400">Average response time: 2 hours</span>
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#FFFFFF', padding: '24px', border: '1px solid var(--color-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'var(--bg-tertiary)', color: 'var(--color-gold-dark)', display: 'flex', alignItems: 'center', justifyCenter: 'center', flexShrink: 0 }}>
+            <div className="bg-white p-6 border border-gray-200 rounded-sm flex items-center gap-4 shadow-sm">
+              <div className="w-12 h-12 rounded-full bg-[#F5E7D6] text-gold-dark flex items-center justify-center shrink-0">
                 <MapPin size={20} />
               </div>
               <div>
-                <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: '#777' }}>Corporate Headquarters</h5>
-                <div style={{ fontSize: '0.96rem', fontWeight: '500', color: 'var(--color-charcoal)' }}>Ratnaya Jewels Tower, Johari Bazaar</div>
-                <span style={{ fontSize: '0.78rem', color: '#888' }}>Jaipur, Rajasthan 302003, India</span>
+                <h5 className="text-xs uppercase text-gray-500 font-medium">Corporate Headquarters</h5>
+                <div className="text-sm sm:text-base font-semibold text-charcoal">Ratnaya Jewels Tower, Johari Bazaar</div>
+                <span className="text-xs text-gray-400">Jaipur, Rajasthan 302003, India</span>
               </div>
-            </div>
-
-            {/* Map Frame */}
-            <div style={{ aspectRatio: '16/9', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
-              <iframe
-                title="Ratnaya Location Map"
-                src="https://maps.google.com/maps?q=Johari%20Bazaar%20Jaipur&t=&z=13&ie=UTF8&iwloc=&output=embed"
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                allowFullScreen=""
-                loading="lazy"
-              />
             </div>
           </div>
         </div>
       </div>
-
-      <style>{`
-        @media (max-width: 992px) {
-          .contact-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
     </div>
   );
 }

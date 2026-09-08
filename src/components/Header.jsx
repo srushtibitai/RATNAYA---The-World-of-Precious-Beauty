@@ -22,7 +22,10 @@ export function Header({
   onOpenWishlist,
   onOpenSearch,
   activeRole,
-  setActiveRole
+  setActiveRole,
+  onOpenAuthModal,
+  currentUser,
+  onLogout
 }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -39,6 +42,18 @@ export function Header({
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Lock Body Scroll when Mobile Menu Drawer is Open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isMobileMenuOpen]);
 
   const navLinks = [
     { id: 'home', label: 'Home' },
@@ -62,46 +77,25 @@ export function Header({
 
   return (
     <>
-      {/* STICKY LUXURY HEADER WITH 33% / 67% DUAL SPLIT BACKGROUND */}
+      {/* STICKY LUXURY HEADER WITH 33% / 67% DUAL SPLIT ALIGNED WITH HERO SECTION */}
       <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          background: isScrolled
-            ? 'rgba(253, 251, 247, 0.98)'
-            : 'linear-gradient(to right, #EFE6DD 0%, #EFE6DD 33%, #FFFFFF 33%, #FFFFFF 100%)',
-          backdropFilter: isScrolled ? 'blur(12px)' : 'none',
-          boxShadow: isScrolled ? '0 4px 20px rgba(0, 0, 0, 0.05)' : 'none',
-          // borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
-          transition: 'all 0.3s ease'
-        }}
+        className={`sticky top-0 z-50 transition-all duration-300 ${
+          isScrolled
+            ? 'bg-white shadow-md border-b border-gold/15'
+            : 'bg-[#FAF6F0] lg:bg-gradient-to-r lg:from-[#EFE6DD] lg:via-[#EFE6DD] lg:via-[33%] lg:to-white lg:to-[33%]'
+        }`}
       >
-        <div
-          style={{
-            width: '100%',
-            display: 'grid',
-            gridTemplateColumns: '33% 67%',
-            minHeight: isScrolled ? '70px' : '82px',
-            alignItems: 'center',
-            transition: 'all 0.3s ease'
-          }}
-        >
-          {/* Left Panel (Beige) - Logo */}
-          <div
-            style={{
-              paddingLeft: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px'
-            }}
-          >
+        <div className={`w-full flex lg:grid lg:grid-cols-[33%_67%] items-center justify-between transition-all duration-300 ${
+          isScrolled ? 'min-h-[54px] sm:min-h-[62px]' : 'min-h-[60px] sm:min-h-[70px]'
+        }`}>
+          {/* Left Panel (Beige) - Hamburger & Logo aligned */}
+          <div className="flex items-center gap-2 sm:gap-3 pl-2.5 sm:pl-5 lg:pl-6 pr-2 py-1.5 shrink-0">
             <button
-              className="mobile-menu-btn"
+              className="lg:hidden text-charcoal p-1 hover:text-gold transition-colors focus:outline-none"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              style={{ display: 'none', color: 'var(--color-charcoal)', padding: '4px' }}
+              aria-label="Toggle Navigation"
             >
-              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
 
             <Logo
@@ -111,144 +105,221 @@ export function Header({
             />
           </div>
 
-          {/* Right Panel (White) - Nav & Actions */}
-          <div
-            style={{
-              paddingLeft: '48px',
-              paddingRight: '48px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}
-          >
-            {/* Center Navigation */}
-            <nav className="desktop-nav" style={{ display: 'flex', gap: '28px' }}>
+          {/* Right Panel (White on Desktop 67% split) - Nav & Actions */}
+          <div className="flex items-center justify-between flex-1 px-3 sm:px-4 lg:px-6 xl:px-8 py-2 min-w-0">
+            {/* Center Desktop Navigation - Distributed Responsive Spacing */}
+            <nav className="hidden lg:flex items-center justify-center gap-4 lg:gap-6 xl:gap-9 2xl:gap-12 flex-1 px-4">
               {navLinks.map((link) => (
                 <button
                   key={link.id}
                   onClick={() => handleNavClick(link.id)}
-                  style={{
-                    fontFamily: "'Outfit', sans-serif",
-                    fontSize: '0.82rem',
-                    fontWeight: activeTab === link.id ? '600' : '400',
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    color: activeTab === link.id ? 'var(--color-gold-dark)' : 'var(--color-charcoal)',
-                    position: 'relative',
-                    padding: '6px 0',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
+                  className={`font-sans text-[0.78rem] xl:text-[0.84rem] uppercase tracking-[0.1em] xl:tracking-[0.14em] whitespace-nowrap relative py-1 bg-transparent border-none cursor-pointer transition-colors duration-200 ${
+                    activeTab === link.id
+                      ? 'font-semibold text-gold-dark'
+                      : 'font-normal text-charcoal hover:text-gold'
+                  }`}
                 >
                   {link.label}
                   {activeTab === link.id && (
-                    <span
-                      style={{
-                        position: 'absolute',
-                        bottom: 0,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        width: '18px',
-                        height: '2px',
-                        backgroundColor: 'var(--color-gold)'
-                      }}
-                    />
+                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-gold rounded-full" />
                   )}
                 </button>
               ))}
             </nav>
 
             {/* Right Actions */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-              <button onClick={onOpenSearch} title="Search" style={{ color: 'var(--color-charcoal)', padding: '6px', background: 'none', border: 'none', cursor: 'pointer' }}>
-                <Search size={20} strokeWidth={1.75} />
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-auto lg:ml-0">
+              <button
+                onClick={onOpenSearch}
+                title="Search"
+                className="text-charcoal hover:text-gold p-1 transition-colors bg-transparent border-none cursor-pointer"
+              >
+                <Search size={18} strokeWidth={1.75} />
               </button>
 
-              <button onClick={onOpenWishlist} title="Wishlist" style={{ color: 'var(--color-charcoal)', padding: '6px', position: 'relative', background: 'none', border: 'none', cursor: 'pointer' }}>
-                <Heart size={20} strokeWidth={1.75} />
+              <button
+                onClick={() => {
+                  if (!currentUser) {
+                    onOpenAuthModal();
+                  } else {
+                    onOpenWishlist();
+                  }
+                }}
+                title="Wishlist"
+                className="text-charcoal hover:text-gold p-1 relative transition-colors bg-transparent border-none cursor-pointer"
+              >
+                <Heart size={18} strokeWidth={1.75} />
                 {wishlistCount > 0 && (
-                  <span style={{ position: 'absolute', top: '2px', right: '2px', backgroundColor: 'var(--color-gold)', color: '#FFF', fontSize: '0.62rem', fontWeight: '700', width: '16px', height: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="absolute -top-1 -right-1 bg-gold text-white text-[0.56rem] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
                     {wishlistCount}
                   </span>
                 )}
               </button>
 
-              <button onClick={onOpenCart} title="Cart" style={{ color: 'var(--color-charcoal)', padding: '6px', position: 'relative', background: 'none', border: 'none', cursor: 'pointer' }}>
-                <ShoppingBag size={20} strokeWidth={1.75} />
+              <button
+                onClick={() => {
+                  if (!currentUser) {
+                    onOpenAuthModal();
+                  } else {
+                    onOpenCart();
+                  }
+                }}
+                title="Cart"
+                className="text-charcoal hover:text-gold p-1 relative transition-colors bg-transparent border-none cursor-pointer"
+              >
+                <ShoppingBag size={18} strokeWidth={1.75} />
                 {cartCount > 0 && (
-                  <span style={{ position: 'absolute', top: '2px', right: '2px', backgroundColor: 'var(--color-charcoal)', color: '#FFF', fontSize: '0.62rem', fontWeight: '700', width: '16px', height: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="absolute -top-1 -right-1 bg-charcoal text-white text-[0.56rem] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
                     {cartCount}
                   </span>
                 )}
               </button>
 
-              {/* Role Switcher Dropdown */}
-              <div style={{ position: 'relative' }}>
+              {/* SINGLE RESPONSIVE AUTH / USER PROFILE BUTTON */}
+              {!currentUser ? (
+                /* WHEN LOGGED OUT: Sleek 28px Circle on Mobile, Pill on Desktop */
                 <button
-                  onClick={() => setShowRoleDropdown(!showRoleDropdown)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: 'rgba(172, 128, 93, 0.08)', border: '1px solid var(--color-border-gold)', borderRadius: '20px', fontSize: '0.72rem', fontWeight: '600', textTransform: 'uppercase', color: 'var(--color-gold-dark)', cursor: 'pointer' }}
+                  onClick={onOpenAuthModal}
+                  className="bg-gold hover:bg-charcoal text-white text-[0.68rem] font-semibold h-7 sm:h-auto sm:py-1 px-0 sm:px-3 w-7 sm:w-auto rounded-full flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer shadow-sm transition-all border border-gold"
+                  title="Sign In"
                 >
-                  <User size={15} /> <span>{activeRole}</span> <ChevronDown size={14} />
+                  <User size={13} className="shrink-0" />
+                  <span className="hidden sm:inline">SIGN IN</span>
                 </button>
+              ) : (
+                /* WHEN LOGGED IN: Sleek 28px Circle on Mobile, Pill on Desktop */
+                <div className="relative">
+                  <button
+                    onClick={() => setShowRoleDropdown(!showRoleDropdown)}
+                    className="bg-gold/15 hover:bg-gold/25 text-gold-dark border border-gold/40 text-xs font-semibold h-7 sm:h-auto sm:py-1 px-0 sm:px-2.5 w-7 sm:w-auto rounded-full flex items-center justify-center gap-1 cursor-pointer transition-all duration-200 shadow-sm"
+                    title={currentUser.name}
+                  >
+                    <User size={13} className="shrink-0" />
+                    <span className="max-w-[70px] sm:max-w-[110px] truncate whitespace-nowrap hidden sm:inline">
+                      {currentUser.name}
+                    </span>
+                    <span className="bg-gold-dark text-white text-[0.52rem] px-1 py-0.5 rounded font-bold uppercase tracking-wider hidden sm:inline">
+                      {currentUser.role}
+                    </span>
+                    <ChevronDown size={10} className="hidden sm:inline" />
+                  </button>
 
-                {showRoleDropdown && (
-                  <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: '200px', backgroundColor: '#FFF', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-medium)', borderRadius: '4px', padding: '8px 0', zIndex: 150 }}>
-                    <div style={{ padding: '6px 16px', fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', borderBottom: '1px solid var(--color-border)', marginBottom: '4px' }}>
-                      Switch View
+                  {showRoleDropdown && (
+                    <div className="absolute right-0 top-full mt-2 w-60 bg-white border border-gold/30 shadow-medium rounded-md py-2 z-50 animate-fadeIn">
+                      <div className="px-4 py-2 border-b border-gray-100 mb-1">
+                        <strong className="text-sm text-charcoal block truncate">
+                          {currentUser.name}
+                        </strong>
+                        <span className="text-xs text-gray-500 block truncate">{currentUser.email}</span>
+                        <div className="mt-1">
+                          <span className="badge-gold text-[0.65rem]">
+                            ROLE: {currentUser.role}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="px-4 py-1 text-[0.65rem] uppercase text-gray-400 tracking-wider">
+                        Navigation Portals
+                      </div>
+
+                      {currentUser.role === 'BUYER' && (
+                        <button
+                          onClick={() => { setActiveRole('BUYER'); setActiveTab('account'); setShowRoleDropdown(false); }}
+                          className="w-full text-left px-4 py-2 text-sm text-charcoal hover:bg-beige-light flex items-center gap-2 bg-transparent border-none cursor-pointer"
+                        >
+                          <User size={16} /> My Account & Orders
+                        </button>
+                      )}
+
+                      {currentUser.role === 'SELLER' && (
+                        <button
+                          onClick={() => { setActiveRole('SELLER'); setActiveTab('seller-dashboard'); setShowRoleDropdown(false); }}
+                          className="w-full text-left px-4 py-2 text-sm text-charcoal hover:bg-beige-light flex items-center gap-2 bg-transparent border-none cursor-pointer"
+                        >
+                          <Store size={16} /> Merchant Portal
+                        </button>
+                      )}
+
+                      {currentUser.role === 'ADMIN' && (
+                        <button
+                          onClick={() => { setActiveRole('ADMIN'); setActiveTab('admin-dashboard'); setShowRoleDropdown(false); }}
+                          className="w-full text-left px-4 py-2 text-sm text-charcoal hover:bg-beige-light flex items-center gap-2 bg-transparent border-none cursor-pointer"
+                        >
+                          <ShieldCheck size={16} /> Admin Control Panel
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => { onLogout(); setShowRoleDropdown(false); }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 font-semibold hover:bg-red-50 flex items-center gap-2 border-t border-gray-100 mt-1 bg-transparent cursor-pointer"
+                      >
+                        Logout Session
+                      </button>
                     </div>
-                    <button onClick={() => { setActiveRole('BUYER'); setActiveTab('account'); setShowRoleDropdown(false); }} style={{ width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', cursor: 'pointer' }}>
-                      <User size={16} /> Buyer Account
-                    </button>
-                    <button onClick={() => { setActiveRole('SELLER'); setActiveTab('seller-dashboard'); setShowRoleDropdown(false); }} style={{ width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', cursor: 'pointer' }}>
-                      <Store size={16} /> Seller Portal
-                    </button>
-                    <button onClick={() => { setActiveRole('ADMIN'); setActiveTab('admin-dashboard'); setShowRoleDropdown(false); }} style={{ width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', cursor: 'pointer' }}>
-                      <ShieldCheck size={16} /> Admin Panel
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={() => { setActiveRole('SELLER'); setActiveTab('seller-register'); }}
-                className="btn-outline-gold become-seller-desktop"
-                style={{ padding: '8px 16px', fontSize: '0.72rem' }}
-              >
-                <Store size={14} /> Become a Seller
-              </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Mobile Navigation Drawer */}
+        {/* Mobile Navigation Drawer Overlay — Full 100vh Solid Opaque Beige Panel */}
         {isMobileMenuOpen && (
-          <div style={{ position: 'fixed', top: '100%', left: 0, right: 0, backgroundColor: '#FAF6F0', borderBottom: '1px solid var(--color-border)', padding: '24px', boxShadow: 'var(--shadow-medium)', zIndex: 90 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="lg:hidden fixed inset-0 z-[999] flex flex-col justify-between bg-[#FAF6F0] w-full h-full min-h-screen">
+            {/* Top Bar with Logo & Close Button */}
+            <div className="flex items-center justify-between p-4 border-b border-[#E8E0D7] bg-[#FAF6F0] shrink-0">
+              <Logo size="small" onClick={() => handleNavClick('home')} />
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-2 text-charcoal hover:text-gold transition-colors cursor-pointer"
+                aria-label="Close Menu"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Menu Links List */}
+            <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-3 bg-[#FAF6F0]">
               {navLinks.map((link) => (
                 <button
                   key={link.id}
                   onClick={() => handleNavClick(link.id)}
-                  style={{ textAlign: 'left', fontFamily: "'Marcellus', serif", fontSize: '1.2rem', color: activeTab === link.id ? 'var(--color-gold-dark)' : 'var(--color-charcoal)', padding: '8px 0', borderBottom: '1px solid rgba(0,0,0,0.05)', background: 'none', border: 'none', cursor: 'pointer' }}
+                  className={`text-left font-heading text-xl py-3 px-3 border-b border-black/5 bg-transparent cursor-pointer transition-colors ${
+                    activeTab === link.id ? 'text-gold-dark font-semibold bg-gold/10 rounded-sm' : 'text-charcoal hover:text-gold'
+                  }`}
                 >
                   {link.label}
                 </button>
               ))}
-              <button onClick={() => { setActiveRole('SELLER'); setActiveTab('seller-register'); setIsMobileMenuOpen(false); }} className="btn-gold" style={{ width: '100%', marginTop: '8px' }}>
-                Become a Seller
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="p-6 border-t border-[#E8E0D7] flex flex-col gap-3 bg-[#FAF6F0] shrink-0">
+              <button
+                onClick={() => {
+                  setActiveRole('SELLER');
+                  setActiveTab('seller-register');
+                  setIsMobileMenuOpen(false);
+                }}
+                className="btn-gold w-full text-xs py-3.5"
+              >
+                <Store size={15} /> Become a Merchant
               </button>
+              {!currentUser && (
+                <button
+                  onClick={() => {
+                    onOpenAuthModal();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="btn-outline w-full text-xs py-3.5"
+                >
+                  Sign In / Register
+                </button>
+              )}
             </div>
           </div>
         )}
       </header>
-
-      <style>{`
-        @media (max-width: 992px) {
-          .desktop-nav { display: none !important; }
-          .mobile-menu-btn { display: flex !important; }
-          .become-seller-desktop { display: none !important; }
-        }
-      `}</style>
     </>
   );
 }
