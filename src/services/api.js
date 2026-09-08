@@ -2,6 +2,16 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://ratnaya-backend.onrender.com/api';
 
+export function getImageUrl(imagePath) {
+  if (!imagePath) return '';
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://') || imagePath.startsWith('data:')) {
+    return imagePath;
+  }
+  const backendBase = API_BASE_URL.replace(/\/api\/?$/, '');
+  const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+  return `${backendBase}${cleanPath}`;
+}
+
 // Helper for HTTP requests with JSON response handling
 async function request(endpoint, options = {}) {
   try {
@@ -286,5 +296,7 @@ export const api = {
     return request(`/profile/${userId}/payments/${paymentId}`, {
       method: 'DELETE'
     });
-  }
+  },
+
+  getImageUrl
 };
