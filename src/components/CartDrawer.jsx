@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Trash2, Plus, Minus, ArrowRight, ShieldCheck, ShoppingBag, Loader2 } from 'lucide-react';
+import { api } from '../services/api';
 
 export function CartDrawer({
   isOpen,
@@ -58,7 +59,7 @@ export function CartDrawer({
                   className="bg-white p-3.5 border border-gray-200 rounded-sm flex gap-3.5 items-center"
                 >
                   <img
-                    src={item.image}
+                    src={api.getImageUrl(item.image)}
                     alt={item.name}
                     className="w-20 h-20 object-cover rounded-sm border border-gray-100 flex-shrink-0"
                   />

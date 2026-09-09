@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Star, Heart, ShoppingBag, Store, ShieldCheck, Check, Loader2 } from 'lucide-react';
+import { api } from '../services/api';
 
 export function QuickViewModal({
   product,
@@ -42,7 +43,7 @@ export function QuickViewModal({
         <div className="bg-white p-6 flex flex-col gap-4">
           <div className="relative aspect-square overflow-hidden rounded-sm bg-[#FAF8F5]">
             <img
-              src={product.images ? product.images[selectedImgIndex] : product.image}
+              src={api.getImageUrl(product.images ? product.images[selectedImgIndex] : product.image)}
               alt={product.name}
               className="w-full h-full object-cover"
             />
@@ -64,7 +65,7 @@ export function QuickViewModal({
                     selectedImgIndex === idx ? 'border-gold ring-2 ring-gold/30' : 'border-gray-200 opacity-60'
                   }`}
                 >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img src={api.getImageUrl(img)} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>

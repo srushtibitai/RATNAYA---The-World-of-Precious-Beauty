@@ -151,7 +151,7 @@ export function HeroSlider({ onNavigateShop, onSelectCategory }) {
         <div className="order-first lg:order-none relative lg:absolute lg:top-1/2 lg:-translate-y-1/2 lg:left-[17%] xl:left-[18.5%] w-[260px] sm:w-[340px] md:w-[400px] lg:w-[420px] xl:w-[520px] 2xl:w-[600px] h-[300px] sm:h-[380px] md:h-[420px] lg:h-[430px] xl:h-[490px] 2xl:h-[530px] rounded-[120px_0_0_0] sm:rounded-[180px_0_0_0] lg:rounded-[220px_0_0_0] overflow-hidden shadow-2xl z-20 bg-white mx-auto my-3 lg:my-0 border border-[#AC805D]/20 transition-all duration-500">
           <img
             key={activeMainImg}
-            src={activeMainImg}
+            src={api.getImageUrl(activeMainImg)}
             alt={slide.title}
             className="w-full h-full object-cover object-center swarna-slide-image hover:scale-105 transition-transform duration-700"
           />
@@ -189,7 +189,7 @@ export function HeroSlider({ onNavigateShop, onSelectCategory }) {
           {/* Floating Solitaire Gold Ring Accent (Desktop 2xl only) */}
           <div key={`ring-${activeSlideIdx}`} className="hidden 2xl:block absolute bottom-8 left-[380px] w-36 h-28 rounded-xl overflow-hidden z-20 animate-float-slow">
             <img
-              src={slide.ringAccent}
+              src={api.getImageUrl(slide.ringAccent)}
               alt="Solitaire Ring"
               className="w-full h-full object-scale-down transition-transform duration-700 hover:scale-110"
             />
@@ -198,7 +198,7 @@ export function HeroSlider({ onNavigateShop, onSelectCategory }) {
           {/* Floating Bottom Right Accent Arched Thumbnail (Desktop xl+ only) */}
           <div key={`accent-${activeSlideIdx}`} className="hidden xl:flex absolute bottom-8 right-8 2xl:right-12 items-end gap-4 swarna-slide-accent">
             <div className="w-36 h-44 xl:w-44 xl:h-56 rounded-t-[100px] overflow-hidden shadow-xl border border-[#AC805D]/20 group cursor-pointer">
-              <img src={slide.accentImage} alt="Accent" className="w-full h-full object-cover transition-transform duration-700 ease-out hover:scale-105" />
+              <img src={api.getImageUrl(slide.accentImage)} alt="Accent" className="w-full h-full object-cover transition-transform duration-700 ease-out hover:scale-105" />
             </div>
           </div>
         </div>

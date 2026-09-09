@@ -21,7 +21,15 @@ import {
   Edit,
   Edit3,
   X,
-  ZoomIn
+  ZoomIn,
+  Trash2,
+  Truck,
+  RotateCcw,
+  XCircle,
+  ShieldCheck,
+  MapPin,
+  Phone,
+  Mail
 } from 'lucide-react';
 
 export function SellerDashboardPage({ currentUser, sellerId }) {
@@ -38,9 +46,52 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
   } : (sellerFromData || SELLERS[0]);
 
   const [activeTab, setActiveTab] = useState('overview');
-  const [sellerProductsList, setSellerProductsList] = useState(
+  const [sellerOrders, setSellerOrders] = useState(MOCK_ORDERS);
+  const [sellerProductsList, setSellerProductsList] = useState(() =>
     PRODUCTS.filter((p) => p.sellerId === seller.id || p.sellerName === seller.name)
   );
+
+  // Load Orders for Seller
+  useEffect(() => {
+    async function loadOrders() {
+      try {
+        const res = await api.getOrders();
+        if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setSellerOrders(res.data);
+        }
+      } catch (err) {
+        console.warn('Seller orders API load fallback:', err);
+      }
+    }
+    loadOrders();
+  }, [activeTab]);
+
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const res = await api.updateOrderStatus(orderId, newStatus);
+      if (res && res.success) {
+        setSellerOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+        );
+      } else {
+        setSellerOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+        );
+      }
+    } catch (err) {
+      console.error('Error updating order status:', err);
+    }
+  };
+
+  const handleDeleteSellerOrder = async (orderId) => {
+    if (!window.confirm(`Are you sure you want to delete order record ${orderId}?`)) return;
+    try {
+      await api.deleteOrder(orderId);
+      setSellerOrders((prev) => prev.filter((o) => o.id !== orderId));
+    } catch (err) {
+      console.error('Error deleting seller order:', err);
+    }
+  };
 
   // Image Lightbox Modal State
   const [previewModal, setPreviewModal] = useState({
@@ -54,11 +105,11 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
   const [editingProduct, setEditingProduct] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const handleImageFileUpload = async (file, callback) => {
+  const handleImageFileUpload = async (file, callback, categoryName = 'general') => {
     if (!file) return;
     setIsUploading(true);
     try {
-      const res = await api.uploadImage(file);
+      const res = await api.uploadImage(file, categoryName);
       if (res && res.success && res.url) {
         callback(res.url);
       } else {
@@ -743,6 +794,231 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                     <h4 className="font-heading text-2xl my-1 text-emerald-700">
                       ₹{Math.round(totalRevenue * (1 - (seller.commissionRate || 10) / 100)).toLocaleString('en-IN')}
                     </h4>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MERCHANT ORDERS TAB */}
+            {activeTab === 'orders' && (
+              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-gray-100 pb-4 mb-6 gap-4">
+                  <div>
+                    <h3 className="font-heading text-2xl text-charcoal mb-1">
+                      Merchant Orders & Fulfillment
+                    </h3>
+                    <p className="text-xs sm:text-sm text-gray-500">
+                      Manage client orders, track insured shipments, update delivery statuses, and handle return requests.
+                    </p>
+                  </div>
+                  <span className="badge-gold text-xs">{sellerOrders.length} Total Orders</span>
+                </div>
+
+                {sellerOrders.length === 0 ? (
+                  <div className="bg-[#FAF6F0] p-12 text-center border border-gray-200 rounded-sm">
+                    <ShoppingBag className="mx-auto text-gold-dark mb-3" size={36} />
+                    <h4 className="font-heading text-xl text-charcoal mb-1">No Orders Found</h4>
+                    <p className="text-xs text-gray-500">New orders placed for your jewellery pieces will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-6">
+                    {sellerOrders.map((ord) => (
+                      <div key={ord.id} className="border border-gray-200 rounded-sm p-5 bg-[#FAF6F0] shadow-xs">
+                        {/* Header */}
+                        <div className="flex flex-col sm:flex-row justify-between pb-4 mb-4 border-b border-gray-200 gap-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <strong className="text-sm font-heading tracking-wide text-charcoal">{ord.id}</strong>
+                              <span className="text-xs text-gray-400">•</span>
+                              <span className="text-xs text-gray-500">Placed on {ord.date}</span>
+                            </div>
+                            <span className="text-xs text-gray-600 block mt-0.5">
+                              Buyer: <strong>{ord.buyerName || ord.customerName || 'Priya Malhotra'}</strong> ({ord.buyerEmail || 'priya.m@gmail.com'})
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            {ord.status === 'Delivered' && (
+                              <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                <CheckCircle2 size={12} /> Delivered
+                              </span>
+                            )}
+                            {ord.status === 'Shipped' && (
+                              <span className="bg-blue-100 text-blue-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                <Truck size={12} /> In Transit
+                              </span>
+                            )}
+                            {ord.status === 'Confirmed' && (
+                              <span className="bg-amber-100 text-amber-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                <Clock size={12} /> Order Confirmed
+                              </span>
+                            )}
+                            {ord.status === 'Return Requested' && (
+                              <span className="bg-purple-100 text-purple-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                <RotateCcw size={12} /> Return Requested
+                              </span>
+                            )}
+                            {ord.status === 'Refunded' && (
+                              <span className="bg-emerald-600 text-white text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                <DollarSign size={12} /> Refunded
+                              </span>
+                            )}
+                            {ord.status === 'Cancelled' && (
+                              <span className="bg-rose-100 text-rose-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                <XCircle size={12} /> Cancelled
+                              </span>
+                            )}
+
+                            <strong className="text-base text-charcoal font-heading">
+                              ₹{(ord.totalAmount || 0).toLocaleString('en-IN')}
+                            </strong>
+                          </div>
+                        </div>
+
+                        {/* Items Purchased */}
+                        {ord.items && ord.items.length > 0 && (
+                          <div className="mb-4 space-y-2">
+                            {ord.items.map((item, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-xs bg-white p-2.5 rounded border border-gray-100">
+                                <div>
+                                  <strong className="text-charcoal block">{item.name}</strong>
+                                  <span className="text-gray-400">Qty: {item.qty || 1} • Price: ₹{(item.price || 0).toLocaleString('en-IN')}</span>
+                                </div>
+                                <span className="font-semibold text-charcoal">₹{((item.price || 0) * (item.qty || 1)).toLocaleString('en-IN')}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Customer Delivery Address */}
+                        {ord.address && (
+                          <div className="mb-4 p-3 bg-white/80 rounded border border-gray-200 text-xs">
+                            <span className="text-gray-500 font-semibold block uppercase tracking-wider mb-0.5 text-[0.68rem]">Shipping Address:</span>
+                            <span className="text-gray-700">{ord.address}</span>
+                          </div>
+                        )}
+
+                        {/* Return Request Details Callout */}
+                        {ord.status === 'Return Requested' && ord.returnDetails && (
+                          <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded text-xs text-purple-900">
+                            <div className="flex items-center justify-between font-bold mb-1">
+                              <span className="flex items-center gap-1 text-purple-800">
+                                <RotateCcw size={14} /> Customer Return Request Received
+                              </span>
+                              <span className="text-[0.68rem] text-purple-700">Date: {ord.returnDetails.requestDate || ord.date}</span>
+                            </div>
+                            <p className="mb-1"><strong>Reason:</strong> {ord.returnDetails.reason}</p>
+                            {ord.returnDetails.comments && (
+                              <p className="italic text-[0.7rem] text-gray-600 mb-1">"{ord.returnDetails.comments}"</p>
+                            )}
+                            <p className="text-[0.68rem] text-purple-700"><strong>Refund Method Choice:</strong> {ord.returnDetails.refundMethod || 'Original Source'}</p>
+                          </div>
+                        )}
+
+                        {/* Refund Completed Callout */}
+                        {ord.status === 'Refunded' && ord.refundDetails && (
+                          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded text-xs text-emerald-900">
+                            <div className="font-bold flex items-center justify-between mb-1">
+                              <span className="flex items-center gap-1 text-emerald-800">
+                                <CheckCircle2 size={14} /> Refund Issued & Completed
+                              </span>
+                              <span className="font-mono text-[0.68rem]">Txn ID: {ord.refundDetails.refundTxnId}</span>
+                            </div>
+                            <p className="text-[0.68rem] text-emerald-700">
+                              Amount ₹{(ord.refundDetails.refundAmount || ord.totalAmount).toLocaleString('en-IN')} credited back on {ord.refundDetails.refundDate}.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Cancelled Callout */}
+                        {ord.status === 'Cancelled' && (
+                          <div className="mb-4 p-2.5 bg-rose-50 border border-rose-200 rounded text-xs text-rose-900 flex items-center justify-between">
+                            <span className="flex items-center gap-1 font-medium">
+                              <XCircle size={14} className="text-rose-600" /> Order Cancelled: {ord.cancellationReason || 'Cancelled'}
+                            </span>
+                            <span className="text-[0.68rem] text-gray-500">{ord.cancelledAt || ord.date}</span>
+                          </div>
+                        )}
+
+                        {/* Actions Footer */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2 border-t border-gray-200">
+                          <div className="flex items-center gap-2 text-xs">
+                            <Truck size={16} className="text-gold-dark shrink-0" />
+                            <span className="text-gray-500">Tracking:</span>
+                            <strong className="font-mono text-charcoal">{ord.trackingNumber || ord.trackingCode || 'BLUEDART-EXP882'}</strong>
+                          </div>
+
+                          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                            {/* Update Status Dropdown */}
+                            <div className="flex items-center gap-1 text-xs">
+                              <span className="text-gray-500 font-medium hidden sm:inline">Status:</span>
+                              <select
+                                value={ord.status || 'Confirmed'}
+                                onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value)}
+                                className="input-field text-xs py-1.5 px-2 font-semibold bg-white border border-gray-300"
+                              >
+                                <option value="Confirmed">Confirmed</option>
+                                <option value="Shipped">Shipped (In Transit)</option>
+                                <option value="Delivered">Delivered</option>
+                                <option value="Return Requested">Return Requested</option>
+                                <option value="Refunded">Refunded</option>
+                                <option value="Cancelled">Cancelled</option>
+                              </select>
+                            </div>
+
+                            {/* Delete Order Action */}
+                            <button
+                              onClick={() => handleDeleteSellerOrder(ord.id)}
+                              className="py-1.5 px-2.5 text-xs text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 rounded border border-red-200 flex items-center gap-1 cursor-pointer font-medium"
+                              title="Delete Order Record"
+                            >
+                              <Trash2 size={13} /> Delete Record
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* STORE PROFILE TAB */}
+            {activeTab === 'store-profile' && (
+              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
+                  <div>
+                    <h3 className="font-heading text-2xl text-charcoal mb-1">
+                      Merchant Store Profile & Compliance
+                    </h3>
+                    <p className="text-xs sm:text-sm text-gray-500">
+                      Your verified jeweller credentials, GSTIN, and BIS Hallmarking license status.
+                    </p>
+                  </div>
+                  <span className="badge-approved text-xs flex items-center gap-1">
+                    <ShieldCheck size={14} /> Verified Merchant Partner
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="bg-[#FAF6F0] p-5 border border-gray-200 rounded-sm space-y-3">
+                    <h4 className="font-heading text-lg text-charcoal border-b border-gray-200 pb-2">Business Information</h4>
+                    <div className="text-xs space-y-2 text-gray-700">
+                      <p><strong>Merchant Name:</strong> {seller.name}</p>
+                      <p><strong>Owner / Goldsmith:</strong> {seller.owner}</p>
+                      <p><strong>Base City:</strong> {seller.city || 'Jaipur, Rajasthan'}</p>
+                      <p><strong>GST Number:</strong> <code className="bg-white px-1.5 py-0.5 rounded font-mono">{seller.gst}</code></p>
+                    </div>
+                  </div>
+
+                  <div className="bg-[#FAF6F0] p-5 border border-gray-200 rounded-sm space-y-3">
+                    <h4 className="font-heading text-lg text-charcoal border-b border-gray-200 pb-2">Quality & Governance</h4>
+                    <div className="text-xs space-y-2 text-gray-700">
+                      <p><strong>BIS Hallmark License:</strong> <span className="text-emerald-700 font-bold">Verified Active (HUID Compliant)</span></p>
+                      <p><strong>Jeweller Rating:</strong> ⭐ {seller.rating} / 5.0</p>
+                      <p><strong>Marketplace Commission Rate:</strong> {seller.commissionRate || 10}%</p>
+                      <p><strong>Account Status:</strong> <span className="badge-approved text-[0.68rem]">Active Merchant</span></p>
+                    </div>
                   </div>
                 </div>
               </div>

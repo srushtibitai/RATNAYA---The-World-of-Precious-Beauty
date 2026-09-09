@@ -23,15 +23,17 @@ import {
   Save,
   X,
   RotateCcw,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
 import { api } from '../services/api';
 
 export function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Admin state management for approvals, sellers & commissions
+  // Admin state management for approvals, sellers, commissions & returns
   const [sellersList, setSellersList] = useState(INITIAL_SELLERS);
+  const [adminOrders, setAdminOrders] = useState(MOCK_ORDERS);
   
   const [pendingSellers, setPendingSellers] = useState(() => {
     try {
@@ -99,7 +101,19 @@ export function AdminDashboardPage() {
       }
     }
 
+    async function syncAdminOrders() {
+      try {
+        const res = await api.getOrders();
+        if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setAdminOrders(res.data);
+        }
+      } catch (e) {
+        console.warn('Admin orders sync fallback:', e);
+      }
+    }
+
     syncBackendPendingProducts();
+    syncAdminOrders();
 
     try {
       const savedSellers = JSON.parse(localStorage.getItem('ratnaya_pending_sellers') || '[]');
@@ -116,6 +130,58 @@ export function AdminDashboardPage() {
       }
     } catch (e) {}
   }, [activeTab]);
+
+  // Handle Approve Return & Issue Refund by Admin
+  const handleApproveRefund = async (order) => {
+    const refundNotes = prompt(`Enter refund notes for order ${order.id}:`, 'Return request approved. Full refund issued.');
+    if (refundNotes === null) return;
+
+    try {
+      const res = await api.processOrderRefund(order.id, {
+        refundAmount: order.totalAmount,
+        notes: refundNotes
+      });
+      if (res && res.success) {
+        setAdminOrders((prev) =>
+          prev.map((o) => (o.id === order.id ? res.data : o))
+        );
+        alert(`Refund processed successfully for order ${order.id}!`);
+      } else {
+        setAdminOrders((prev) =>
+          prev.map((o) =>
+            o.id === order.id
+              ? {
+                  ...o,
+                  status: 'Refunded',
+                  refundDetails: {
+                    refundAmount: order.totalAmount,
+                    refundTxnId: `RFND-${Math.floor(10000000 + Math.random() * 90000000)}`,
+                    refundDate: new Date().toISOString().split('T')[0],
+                    notes: refundNotes
+                  }
+                }
+              : o
+          )
+        );
+        alert(`Refund recorded for order ${order.id}.`);
+      }
+    } catch (err) {
+      console.error('Refund approval error:', err);
+    }
+  };
+
+  // Handle Delete Order by Admin
+  const handleDeleteAdminOrder = async (orderId) => {
+    if (!window.confirm(`Permanently delete order record ${orderId} from system?`)) return;
+
+    try {
+      await api.deleteOrder(orderId);
+      setAdminOrders((prev) => prev.filter((o) => o.id !== orderId));
+      alert(`Order ${orderId} deleted successfully.`);
+    } catch (err) {
+      console.error('Delete order error:', err);
+    }
+  };
 
   // Load Sellers from Backend API on mount
   useEffect(() => {
@@ -305,6 +371,7 @@ export function AdminDashboardPage() {
                 { id: 'commission', label: 'Commissions & Rates', icon: <Percent size={18} /> },
                 { id: 'seller-approvals', label: `Seller Approvals (${pendingSellers.length})`, icon: <Store size={18} /> },
                 { id: 'product-approvals', label: `Product Approvals (${pendingProducts.length})`, icon: <Package size={18} /> },
+                { id: 'returns', label: `Returns & Refunds (${adminOrders.filter((o) => o.status === 'Return Requested').length})`, icon: <RotateCcw size={18} /> },
                 { id: 'orders', label: 'All Orders & Logistics', icon: <ShoppingBag size={18} /> }
               ].map((tab) => (
                 <button
@@ -646,12 +713,97 @@ export function AdminDashboardPage() {
               </div>
             )}
 
+            {/* RETURNS & REFUNDS MANAGER TAB */}
+            {activeTab === 'returns' && (
+              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
+                  <div>
+                    <h3 className="font-heading text-2xl text-charcoal">Returns & Refund Approvals</h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Manage buyer 14-day insured return requests, approve reverse pickups, and issue refunds.
+                    </p>
+                  </div>
+                  <span className="badge-gold text-xs">
+                    {adminOrders.filter((o) => o.status === 'Return Requested').length} Pending Return Requests
+                  </span>
+                </div>
+
+                {adminOrders.filter((o) => ['Return Requested', 'Refunded'].includes(o.status)).length === 0 ? (
+                  <div className="bg-[#FAF6F0] p-12 text-center border border-gray-200 rounded-sm">
+                    <CheckCircle2 className="mx-auto text-emerald-600 mb-3" size={36} />
+                    <h4 className="font-heading text-xl text-charcoal mb-1">No Return Requests Pending</h4>
+                    <p className="text-xs text-gray-500">All customer return requests and refunds are processed.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {adminOrders
+                      .filter((o) => ['Return Requested', 'Refunded'].includes(o.status))
+                      .map((ord) => (
+                        <div key={ord.id} className="p-5 border border-gray-200 rounded-sm bg-[#FAF6F0] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <strong className="font-mono text-sm text-gold-dark">{ord.id}</strong>
+                              <span className="text-xs text-gray-500">• Customer: {ord.buyerName || ord.customerName || 'Priya Malhotra'} ({ord.buyerEmail || 'priya.m@gmail.com'})</span>
+                            </div>
+                            <div className="text-xs text-gray-700">
+                              Seller: <strong>{ord.sellerName || 'Heritage Gold Kolkata'}</strong> | Total Amount: <strong className="text-charcoal font-semibold">₹{(ord.totalAmount || 0).toLocaleString('en-IN')}</strong>
+                            </div>
+
+                            {ord.returnDetails && (
+                              <div className="mt-2 p-3 bg-white rounded border border-purple-200 text-xs">
+                                <div className="text-purple-900 font-semibold mb-0.5">
+                                  Return Reason: {ord.returnDetails.reason}
+                                </div>
+                                {ord.returnDetails.comments && (
+                                  <div className="text-gray-600 italic text-[0.7rem]">"{ord.returnDetails.comments}"</div>
+                                )}
+                                <div className="text-[0.68rem] text-purple-700 mt-1 font-medium">
+                                  Payout Mode: {ord.returnDetails.refundMethod || 'Original Payment Source'}
+                                </div>
+                              </div>
+                            )}
+
+                            {ord.status === 'Refunded' && ord.refundDetails && (
+                              <div className="mt-2 p-2.5 bg-emerald-50 rounded border border-emerald-200 text-xs text-emerald-900">
+                                <strong>Refund Completed:</strong> Txn ID {ord.refundDetails.refundTxnId} | Amount: ₹{(ord.refundDetails.refundAmount || ord.totalAmount).toLocaleString('en-IN')} on {ord.refundDetails.refundDate}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+                            {ord.status === 'Return Requested' && (
+                              <button
+                                onClick={() => handleApproveRefund(ord)}
+                                className="btn-gold py-2 px-4 text-xs font-semibold flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                              >
+                                <DollarSign size={14} /> Approve & Issue Refund
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => handleDeleteAdminOrder(ord.id)}
+                              className="py-2 px-3 text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200 font-medium flex items-center gap-1 cursor-pointer"
+                              title="Delete Order Record"
+                            >
+                              <Trash2 size={13} /> Delete Record
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ORDERS & LOGISTICS TAB */}
             {activeTab === 'orders' && (
               <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm">
-                <h3 className="font-heading text-2xl mb-4">
-                  Marketplace Orders & Logistics Monitoring
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-heading text-2xl text-charcoal">
+                    Marketplace Orders & Logistics Monitoring
+                  </h3>
+                  <span className="badge-gold text-xs">{adminOrders.length} Total Orders</span>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs sm:text-sm border-collapse min-w-[700px]">
                     <thead>
@@ -660,22 +812,34 @@ export function AdminDashboardPage() {
                         <th className="p-3">Customer</th>
                         <th className="p-3">Seller</th>
                         <th className="p-3">Amount</th>
-                        <th className="p-3">Payment</th>
-                        <th className="p-3">Logistics Status</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {MOCK_ORDERS.map((ord) => (
+                      {adminOrders.map((ord) => (
                         <tr key={ord.id} className="hover:bg-gray-50">
                           <td className="p-3 font-mono font-semibold text-gold-dark">{ord.id}</td>
-                          <td className="p-3">{ord.customerName}</td>
-                          <td className="p-3">{ord.sellerName}</td>
-                          <td className="p-3 font-semibold">₹{ord.totalAmount.toLocaleString('en-IN')}</td>
-                          <td className="p-3"><span className="badge-approved text-[0.65rem]">{ord.paymentStatus}</span></td>
+                          <td className="p-3">{ord.buyerName || ord.customerName || 'Priya Malhotra'}</td>
+                          <td className="p-3">{ord.sellerName || 'Jewellery Merchant'}</td>
+                          <td className="p-3 font-semibold">₹{(ord.totalAmount || 0).toLocaleString('en-IN')}</td>
                           <td className="p-3">
-                            <span className="text-xs bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-medium">
-                              {ord.shippingStatus}
+                            <span className={`text-xs px-2.5 py-0.5 rounded font-medium ${
+                              ord.status === 'Refunded' ? 'bg-emerald-100 text-emerald-800' :
+                              ord.status === 'Return Requested' ? 'bg-purple-100 text-purple-800' :
+                              ord.status === 'Cancelled' ? 'bg-rose-100 text-rose-800' :
+                              'bg-amber-50 text-amber-800 border border-amber-200'
+                            }`}>
+                              {ord.status || 'Confirmed'}
                             </span>
+                          </td>
+                          <td className="p-3 text-right">
+                            <button
+                              onClick={() => handleDeleteAdminOrder(ord.id)}
+                              className="text-xs text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2 py-1 rounded border border-red-200 font-medium inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 size={12} /> Delete
+                            </button>
                           </td>
                         </tr>
                       ))}

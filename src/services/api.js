@@ -113,10 +113,13 @@ export const api = {
     });
   },
 
-  async uploadImage(file) {
+  async uploadImage(file, category = 'general') {
     try {
       const formData = new FormData();
       formData.append('image', file);
+      if (category) {
+        formData.append('category', category);
+      }
 
       const response = await fetch(`${API_BASE_URL}/upload`, {
         method: 'POST',
@@ -162,6 +165,33 @@ export const api = {
     return request(`/orders/${id}/status`, {
       method: 'PUT',
       body: { status }
+    });
+  },
+
+  async requestOrderReturn(id, returnData) {
+    return request(`/orders/${id}/return`, {
+      method: 'POST',
+      body: returnData
+    });
+  },
+
+  async cancelOrder(id, reason) {
+    return request(`/orders/${id}/cancel`, {
+      method: 'PUT',
+      body: { reason }
+    });
+  },
+
+  async processOrderRefund(id, refundData) {
+    return request(`/orders/${id}/refund`, {
+      method: 'PUT',
+      body: refundData || {}
+    });
+  },
+
+  async deleteOrder(id) {
+    return request(`/orders/${id}`, {
+      method: 'DELETE'
     });
   },
 
@@ -296,6 +326,25 @@ export const api = {
     return request(`/profile/${userId}/payments/${paymentId}`, {
       method: 'DELETE'
     });
+  },
+
+  // Shiprocket Delivery Partner Integration
+  async checkShippingServiceability(deliveryPostcode, weight = 0.5) {
+    return request('/shipping/check-serviceability', {
+      method: 'POST',
+      body: { deliveryPostcode, weight }
+    });
+  },
+
+  async createShippingOrder(orderData) {
+    return request('/shipping/create-order', {
+      method: 'POST',
+      body: orderData
+    });
+  },
+
+  async trackShipment(awb) {
+    return request(`/shipping/track/${awb}`);
   },
 
   getImageUrl

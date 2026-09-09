@@ -83,6 +83,7 @@ export function PolicyPages({ initialTab = 'shipping', onNavigateShop, onNavigat
         >
           {[
             { id: 'shipping', label: 'Shipping & Delivery Policy', icon: <Truck size={18} /> },
+            { id: 'return-policy', label: '14-Day Return & Refund Policy', icon: <RotateCcw size={18} /> },
             { id: 'terms', label: 'Terms & Conditions', icon: <FileText size={18} /> },
             { id: 'privacy', label: 'Privacy & Data Protection', icon: <Lock size={18} /> },
             { id: 'faqs', label: 'Frequently Asked Questions (FAQ)', icon: <HelpCircle size={18} /> }
@@ -258,6 +259,59 @@ export function PolicyPages({ initialTab = 'shipping', onNavigateShop, onNavigat
                 </h3>
                 <p style={{ color: '#555', fontSize: '0.92rem' }}>
                   All high-resolution photography, 3D renders, video accordions, brand logos, and custom Kundan/Polki filigree design representations published on Ratnaya are protected under Indian Copyright and Trademark Acts. Unauthorized reproduction is strictly prohibited.
+                </p>
+              </section>
+            </div>
+          )}
+
+          {/* RETURN & REFUND POLICY SECTION */}
+          {(activePolicy === 'return-policy' || activePolicy === 'returns') && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', color: 'var(--color-gold-dark)', borderBottom: '1px solid var(--color-border)', paddingBottom: '16px' }}>
+                <RotateCcw size={32} />
+                <div>
+                  <h2 style={{ fontSize: '1.7rem', fontFamily: "'Marcellus', serif", margin: 0 }}>
+                    14-Day Insured Return & Refund Policy
+                  </h2>
+                  <span style={{ fontSize: '0.78rem', color: '#777', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                    100% Money-Back Guarantee & Insured Reverse Pickup
+                  </span>
+                </div>
+              </div>
+
+              <section>
+                <h3 style={{ fontSize: '1.2rem', color: 'var(--color-charcoal)', marginBottom: '10px', fontFamily: "'Marcellus', serif" }}>
+                  1. Return Eligibility & 14-Day Guarantee Window
+                </h3>
+                <p style={{ color: '#555', fontSize: '0.92rem', lineHeight: 1.7 }}>
+                  At Ratnaya, we stand behind the craftsmanship and purity of every hallmarked creation. If you are not completely enchanted with your purchase, you may initiate a return within <strong>14 calendar days</strong> of parcel delivery for a full 100% refund.
+                </p>
+                <ul style={{ color: '#555', fontSize: '0.92rem', paddingLeft: '20px', marginTop: '8px', lineHeight: 1.7 }}>
+                  <li>The tamper-proof security tag attached to the jewellery piece must remain intact and undamaged.</li>
+                  <li>Original BIS Hallmarking certificates, diamond lab certificates (GIA/IGI/SGL), and luxury packaging boxes must be included.</li>
+                  <li>Custom engraved, resized, or bespoke commissioned heirlooms are non-refundable but eligible for exchange.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 style={{ fontSize: '1.2rem', color: 'var(--color-charcoal)', marginBottom: '10px', fontFamily: "'Marcellus', serif" }}>
+                  2. Step-by-Step Return Process
+                </h3>
+                <ol style={{ color: '#555', fontSize: '0.92rem', paddingLeft: '20px', lineHeight: 1.7 }}>
+                  <li>Navigate to your <strong>Buyer Account &gt; My Orders</strong> tab.</li>
+                  <li>Select the delivered order and click <strong>Request 14-Day Return</strong>.</li>
+                  <li>Choose your reason for return and select your preferred payout option (Original Payment Mode, UPI ID, or Direct Bank Transfer).</li>
+                  <li>Our insured logistics partner (BlueDart / Sequel Logistics) will collect the parcel from your address in a tamper-evident bag.</li>
+                  <li>Once inspected by our Quality Control Atelier, your refund will be released within <strong>24 business hours</strong>.</li>
+                </ol>
+              </section>
+
+              <section>
+                <h3 style={{ fontSize: '1.2rem', color: 'var(--color-charcoal)', marginBottom: '10px', fontFamily: "'Marcellus', serif" }}>
+                  3. Order Cancellation & Instant Refund Policy
+                </h3>
+                <p style={{ color: '#555', fontSize: '0.92rem', lineHeight: 1.7 }}>
+                  You may cancel any order free of charge at any time prior to shipment dispatch directly from your <strong>My Orders</strong> page. For cancelled orders, 100% of the paid amount is refunded immediately to your original payment account.
                 </p>
               </section>
             </div>

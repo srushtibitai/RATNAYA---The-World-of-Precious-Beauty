@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Heart, ShoppingBag, Trash2, Loader2 } from 'lucide-react';
+import { api } from '../services/api';
 
 export function WishlistDrawer({
   isOpen,
@@ -50,7 +51,7 @@ export function WishlistDrawer({
                   className="bg-white p-3.5 border border-gray-200 rounded-sm flex gap-3.5 items-center"
                 >
                   <img
-                    src={item.images ? item.images[0] : item.image}
+                    src={api.getImageUrl(item.images ? item.images[0] : item.image)}
                     alt={item.name}
                     className="w-20 h-20 object-cover rounded-sm border border-gray-100 flex-shrink-0"
                   />

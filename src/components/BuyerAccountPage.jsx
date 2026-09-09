@@ -18,7 +18,12 @@ import {
   Calendar,
   X,
   Loader2,
-  Trash2
+  Trash2,
+  RotateCcw,
+  XCircle,
+  AlertCircle,
+  RefreshCw,
+  DollarSign
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -64,7 +69,31 @@ export function BuyerAccountPage({ user, wishlistItems = [], onAddToCart, onNavi
     isDefault: false
   });
 
-  // Fetch Profile, Addresses & Payments from MongoDB API
+  // Orders State & Toast
+  const [ordersList, setOrdersList] = useState(MOCK_ORDERS);
+  const [ordersFilter, setOrdersFilter] = useState('All');
+  const [orderToast, setOrderToast] = useState('');
+
+  // Return Request Modal State
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [selectedOrderForReturn, setSelectedOrderForReturn] = useState(null);
+  const [returnReason, setReturnReason] = useState('Defective or Damaged Item');
+  const [returnComments, setReturnComments] = useState('');
+  const [refundMethod, setRefundMethod] = useState('Original Payment Source');
+  const [upiId, setUpiId] = useState('');
+  const [bankAccountDetails, setBankAccountDetails] = useState({
+    accountNumber: '',
+    ifscCode: '',
+    bankName: '',
+    accountHolder: ''
+  });
+
+  // Cancel Order Modal State
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [selectedOrderForCancel, setSelectedOrderForCancel] = useState(null);
+  const [cancelReason, setCancelReason] = useState('Changed my mind');
+
+  // Fetch Profile, Addresses, Payments & Orders from API
   useEffect(() => {
     let isMounted = true;
     async function loadProfileData() {
@@ -94,11 +123,134 @@ export function BuyerAccountPage({ user, wishlistItems = [], onAddToCart, onNavi
         if (isMounted) setLoading(false);
       }
     }
+
+    async function loadOrdersData() {
+      try {
+        const res = await api.getOrders();
+        if (isMounted && res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setOrdersList(res.data);
+        }
+      } catch (err) {
+        console.warn('Orders load fallback:', err);
+      }
+    }
+
     loadProfileData();
+    loadOrdersData();
     return () => {
       isMounted = false;
     };
   }, [userId, user]);
+
+  // Open Return Modal for specific Order
+  const handleOpenReturnModal = (order) => {
+    setSelectedOrderForReturn(order);
+    setReturnReason('Defective or Damaged Item');
+    setReturnComments('');
+    setRefundMethod('Original Payment Source');
+    setUpiId('');
+    setBankAccountDetails({ accountNumber: '', ifscCode: '', bankName: '', accountHolder: profileData.name });
+    setIsReturnModalOpen(true);
+  };
+
+  // Submit Return Request
+  const handleReturnSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedOrderForReturn) return;
+
+    const returnPayload = {
+      reason: returnReason,
+      comments: returnComments,
+      refundMethod,
+      upiId: refundMethod === 'UPI' ? upiId : null,
+      bankDetails: refundMethod === 'Direct Bank Transfer' ? bankAccountDetails : null
+    };
+
+    try {
+      const res = await api.requestOrderReturn(selectedOrderForReturn.id, returnPayload);
+      if (res && res.success) {
+        setOrdersList((prev) =>
+          prev.map((o) => (o.id === selectedOrderForReturn.id ? res.data : o))
+        );
+        setOrderToast(`Return request for ${selectedOrderForReturn.id} submitted successfully!`);
+      } else {
+        // Fallback update local state
+        setOrdersList((prev) =>
+          prev.map((o) =>
+            o.id === selectedOrderForReturn.id
+              ? {
+                  ...o,
+                  status: 'Return Requested',
+                  returnDetails: {
+                    requestDate: new Date().toISOString().split('T')[0],
+                    reason: returnReason,
+                    comments: returnComments,
+                    refundMethod,
+                    status: 'Pending Approval'
+                  }
+                }
+              : o
+          )
+        );
+        setOrderToast(`Return request submitted successfully for ${selectedOrderForReturn.id}`);
+      }
+    } catch (err) {
+      console.error('Error requesting return:', err);
+    } finally {
+      setIsReturnModalOpen(false);
+      setTimeout(() => setOrderToast(''), 4000);
+    }
+  };
+
+  // Open Cancel Modal
+  const handleOpenCancelModal = (order) => {
+    setSelectedOrderForCancel(order);
+    setCancelReason('Changed my mind / Placed by mistake');
+    setIsCancelModalOpen(true);
+  };
+
+  // Submit Cancel Order
+  const handleCancelSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedOrderForCancel) return;
+
+    try {
+      const res = await api.cancelOrder(selectedOrderForCancel.id, cancelReason);
+      if (res && res.success) {
+        setOrdersList((prev) =>
+          prev.map((o) => (o.id === selectedOrderForCancel.id ? res.data : o))
+        );
+      } else {
+        setOrdersList((prev) =>
+          prev.map((o) =>
+            o.id === selectedOrderForCancel.id
+              ? { ...o, status: 'Cancelled', cancellationReason: cancelReason }
+              : o
+          )
+        );
+      }
+      setOrderToast(`Order ${selectedOrderForCancel.id} has been cancelled.`);
+    } catch (err) {
+      console.error('Error cancelling order:', err);
+    } finally {
+      setIsCancelModalOpen(false);
+      setTimeout(() => setOrderToast(''), 4000);
+    }
+  };
+
+  // Delete Order Record
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm(`Are you sure you want to remove order record ${orderId} from history?`)) return;
+
+    try {
+      await api.deleteOrder(orderId);
+      setOrdersList((prev) => prev.filter((o) => o.id !== orderId));
+      setOrderToast(`Order record ${orderId} deleted successfully.`);
+      setTimeout(() => setOrderToast(''), 3000);
+    } catch (err) {
+      console.error('Error deleting order:', err);
+    }
+  };
 
   // Handle Profile Update in MongoDB
   const handleProfileSave = async (e) => {
@@ -347,51 +499,251 @@ export function BuyerAccountPage({ user, wishlistItems = [], onAddToCart, onNavi
               </div>
             )}
 
-            {/* TAB 2: MY ORDERS */}
+            {/* TAB 2: MY ORDERS & RETURNS */}
             {activeTab === 'orders' && (
               <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm">
-                <h3 className="font-heading text-xl sm:text-2xl mb-2">
-                  My Orders & Shipment Tracking
-                </h3>
-                <p className="text-xs sm:text-sm text-gray-500 mb-6">
-                  Track insured courier shipments, view BIS hallmarking certificates, and manage returns.
-                </p>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-4 mb-6 gap-4">
+                  <div>
+                    <h3 className="font-heading text-xl sm:text-2xl mb-1 text-charcoal">
+                      My Orders & Returns
+                    </h3>
+                    <p className="text-xs sm:text-sm text-gray-500">
+                      Track insured transit, initiate 14-day returns, view refund status, or cancel orders.
+                    </p>
+                  </div>
 
+                  {/* Filter Badges */}
+                  <div className="flex items-center gap-1 bg-[#FAF6F0] p-1 border border-gray-200 rounded-sm text-xs">
+                    {['All', 'Active', 'Returned / Refunded', 'Cancelled'].map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setOrdersFilter(f)}
+                        className={`px-3 py-1 rounded-xs font-medium cursor-pointer transition-colors ${
+                          ordersFilter === f ? 'bg-gold text-white shadow-xs' : 'text-gray-600 hover:text-charcoal'
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Order Toast */}
+                {orderToast && (
+                  <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-sm text-xs sm:text-sm font-medium flex items-center gap-2 shadow-xs animate-fadeIn">
+                    <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                    <span>{orderToast}</span>
+                  </div>
+                )}
+
+                {/* Orders List */}
                 <div className="flex flex-col gap-6">
-                  {MOCK_ORDERS.map((order) => (
-                    <div
-                      key={order.id}
-                      className="border border-gray-200 rounded-sm p-5 bg-[#FAF6F0]"
-                    >
-                      <div className="flex flex-col sm:flex-row justify-between pb-4 mb-4 border-b border-gray-200 gap-2">
-                        <div>
-                          <strong className="text-sm block text-charcoal">{order.id}</strong>
-                          <span className="text-xs text-gray-500">
-                            Placed on {order.date} • Sold by <strong>{order.sellerName}</strong>
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="badge-approved text-xs flex items-center gap-1">
-                            <CheckCircle2 size={12} /> {order.status}
-                          </span>
-                          <strong className="text-base text-charcoal">₹{order.totalAmount.toLocaleString('en-IN')}</strong>
-                        </div>
-                      </div>
+                  {ordersList
+                    .filter((order) => {
+                      if (ordersFilter === 'Active') return ['Confirmed', 'Shipped', 'Processing'].includes(order.status);
+                      if (ordersFilter === 'Returned / Refunded') return ['Return Requested', 'Refunded'].includes(order.status);
+                      if (ordersFilter === 'Cancelled') return order.status === 'Cancelled';
+                      return true;
+                    })
+                    .map((order) => {
+                      const isReturnable = ['Delivered', 'Shipped', 'Confirmed'].includes(order.status) && !['Return Requested', 'Refunded', 'Cancelled'].includes(order.status);
+                      const isCancellable = !['Cancelled', 'Refunded'].includes(order.status);
+                      const isDeletable = ['Cancelled', 'Refunded', 'Delivered'].includes(order.status);
 
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div className="flex items-center gap-3">
-                          <Truck size={18} className="text-gold-dark shrink-0" />
-                          <div className="text-xs">
-                            <span className="text-gray-500 block">Insured Transit Tracking:</span>
-                            <strong className="font-mono text-charcoal">{order.trackingCode} ({order.courier})</strong>
+                      return (
+                        <div
+                          key={order.id}
+                          className="border border-gray-200 rounded-sm p-5 bg-[#FAF6F0] shadow-xs relative"
+                        >
+                          {/* Order Header */}
+                          <div className="flex flex-col sm:flex-row justify-between pb-4 mb-4 border-b border-gray-200 gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <strong className="text-sm font-heading tracking-wide text-charcoal">{order.id}</strong>
+                                <span className="text-xs text-gray-400">•</span>
+                                <span className="text-xs text-gray-500">Placed on {order.date}</span>
+                              </div>
+                              <span className="text-xs text-gray-600 block mt-0.5">
+                                Merchant: <strong>{order.sellerName || 'Ratnaya Atelier Merchant'}</strong>
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              {order.status === 'Delivered' && (
+                                <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                  <CheckCircle2 size={12} /> Delivered
+                                </span>
+                              )}
+                              {order.status === 'Shipped' && (
+                                <span className="bg-blue-100 text-blue-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                  <Truck size={12} /> In Transit
+                                </span>
+                              )}
+                              {order.status === 'Confirmed' && (
+                                <span className="bg-amber-100 text-amber-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                  <Clock size={12} /> Order Confirmed
+                                </span>
+                              )}
+                              {order.status === 'Return Requested' && (
+                                <span className="bg-purple-100 text-purple-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                  <RotateCcw size={12} /> Return Requested
+                                </span>
+                              )}
+                              {order.status === 'Refunded' && (
+                                <span className="bg-emerald-600 text-white text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1 shadow-xs">
+                                  <DollarSign size={12} /> Refunded
+                                </span>
+                              )}
+                              {order.status === 'Cancelled' && (
+                                <span className="bg-rose-100 text-rose-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                  <XCircle size={12} /> Cancelled
+                                </span>
+                              )}
+
+                              <strong className="text-base text-charcoal font-heading">
+                                ₹{(order.totalAmount || 0).toLocaleString('en-IN')}
+                              </strong>
+                            </div>
+                          </div>
+
+                          {/* Items List */}
+                          {order.items && order.items.length > 0 && (
+                            <div className="mb-4 space-y-2">
+                              {order.items.map((item, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-xs bg-white p-2.5 rounded border border-gray-100">
+                                  <div>
+                                    <span className="font-medium text-charcoal block">{item.name}</span>
+                                    <span className="text-gray-400">Qty: {item.qty || 1} • Sold by {item.sellerName || order.sellerName}</span>
+                                  </div>
+                                  <span className="font-semibold text-charcoal">₹{(item.price || 0).toLocaleString('en-IN')}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Refund Information Banner */}
+                          {order.status === 'Refunded' && (
+                            <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-sm text-xs text-emerald-900">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-bold flex items-center gap-1.5 uppercase tracking-wider text-emerald-800">
+                                  <CheckCircle2 size={16} /> Refund Completed
+                                </span>
+                                <span className="font-mono text-emerald-700 font-bold">
+                                  Txn ID: {order.refundDetails?.refundTxnId || 'RFND-89210492'}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-white/80 p-2.5 rounded border border-emerald-100">
+                                <div>
+                                  <span className="text-gray-500 block text-[0.68rem]">Refund Amount:</span>
+                                  <strong className="text-emerald-700 font-bold text-sm">₹{(order.refundDetails?.refundAmount || order.totalAmount).toLocaleString('en-IN')}</strong>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 block text-[0.68rem]">Refund Date:</span>
+                                  <strong className="text-gray-700">{order.refundDetails?.refundDate || order.date}</strong>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500 block text-[0.68rem]">Payout Destination:</span>
+                                  <strong className="text-gray-700">{order.returnDetails?.refundMethod || order.paymentMethod || 'Original Payment Account'}</strong>
+                                </div>
+                              </div>
+                              <p className="mt-2 text-[0.68rem] text-emerald-700">
+                                {order.refundDetails?.notes || 'The full amount has been credited back to your bank/account.'}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Return Requested Banner */}
+                          {order.status === 'Return Requested' && (
+                            <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-sm text-xs text-purple-900">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-bold flex items-center gap-1.5 uppercase tracking-wider text-purple-800">
+                                  <RotateCcw size={15} /> Return Under Review
+                                </span>
+                                <span className="text-purple-700 font-semibold">Requested: {order.returnDetails?.requestDate || order.date}</span>
+                              </div>
+                              <p className="text-xs text-purple-800 mb-1">
+                                <strong>Reason:</strong> {order.returnDetails?.reason || 'Return Requested'}
+                              </p>
+                              {order.returnDetails?.comments && (
+                                <p className="text-[0.7rem] text-gray-600 italic mb-2">"{order.returnDetails.comments}"</p>
+                              )}
+                              <div className="text-[0.68rem] text-purple-700 bg-white/70 p-2 rounded border border-purple-100">
+                                Insured doorstep reverse pickup will be scheduled upon quality approval. Refund will be credited directly to your <strong>{order.returnDetails?.refundMethod || 'Nominated Account'}</strong>.
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Cancelled Banner */}
+                          {order.status === 'Cancelled' && (
+                            <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-sm text-xs text-rose-900 flex items-center justify-between">
+                              <span className="flex items-center gap-1.5 font-medium">
+                                <XCircle size={15} className="text-rose-600" /> Order cancelled. Reason: {order.cancellationReason || 'Cancelled by buyer'}
+                              </span>
+                              <span className="text-[0.68rem] text-gray-500">{order.cancelledAt || order.date}</span>
+                            </div>
+                          )}
+
+                          {/* Transit & Action Buttons */}
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2 border-t border-gray-200/60">
+                            <div className="flex items-center gap-3">
+                              <Truck size={18} className="text-gold-dark shrink-0" />
+                              <div className="text-xs">
+                                <span className="text-gray-500 block">Insured Courier Tracking:</span>
+                                <strong className="font-mono text-charcoal">{order.trackingNumber || order.trackingCode || 'BLUEDART-EXP8812'}</strong>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+                              {/* Return Button */}
+                              {isReturnable && (
+                                <button
+                                  onClick={() => handleOpenReturnModal(order)}
+                                  className="btn-outline-gold py-1.5 px-3 text-xs flex items-center gap-1.5 cursor-pointer font-semibold"
+                                >
+                                  <RotateCcw size={13} /> Request 14-Day Return
+                                </button>
+                              )}
+
+                              {/* Cancel Button */}
+                              {isCancellable && (
+                                <button
+                                  onClick={() => handleOpenCancelModal(order)}
+                                  className="py-1.5 px-3 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-300 rounded hover:bg-rose-100 flex items-center gap-1 cursor-pointer"
+                                >
+                                  <XCircle size={13} /> Cancel Order
+                                </button>
+                              )}
+
+                              {/* Delete Record Button */}
+                              {isDeletable && (
+                                <button
+                                  onClick={() => handleDeleteOrder(order.id)}
+                                  className="py-1.5 px-2.5 text-xs text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 rounded border border-red-200 flex items-center gap-1 cursor-pointer font-medium"
+                                  title="Delete order record from history"
+                                >
+                                  <Trash2 size={13} /> Delete Record
+                                </button>
+                              )}
+
+                              {/* Reorder Button */}
+                              <button onClick={onNavigateShop} className="btn-outline-gold py-1.5 px-3 text-xs">
+                                Reorder Items
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        <button onClick={onNavigateShop} className="btn-outline-gold py-1.5 px-3 text-xs">
-                          Reorder Items
-                        </button>
-                      </div>
+                      );
+                    })}
+
+                  {ordersList.length === 0 && (
+                    <div className="text-center py-12 text-gray-500 bg-[#FAF6F0] rounded border border-dashed border-gray-300">
+                      <Package size={32} className="mx-auto mb-2 text-gold-dark" />
+                      <p className="text-sm font-medium mb-3">No order records found in your account.</p>
+                      <button onClick={onNavigateShop} className="btn-gold py-2 px-5 text-xs">
+                        EXPLORE JEWELLERY CATALOGUE
+                      </button>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             )}
@@ -791,6 +1143,210 @@ export function BuyerAccountPage({ user, wishlistItems = [], onAddToCart, onNavi
                 </button>
                 <button type="submit" className="btn-gold py-2.5 px-6 text-xs font-semibold">
                   SAVE PAYMENT TO MONGODB
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: RETURN REQUEST MODAL */}
+      {isReturnModalOpen && selectedOrderForReturn && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[300] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-xl rounded-sm shadow-2xl border border-gold/40 overflow-hidden animate-fadeIn my-8">
+            <div className="p-5 border-b border-gray-200 flex items-center justify-between bg-[#FAF6F0]">
+              <div className="flex items-center gap-2">
+                <RotateCcw size={20} className="text-gold-dark" />
+                <div>
+                  <h3 className="font-heading text-lg text-charcoal">Request 14-Day Insured Return</h3>
+                  <span className="text-xs text-gray-500">Order ID: {selectedOrderForReturn.id}</span>
+                </div>
+              </div>
+              <button onClick={() => setIsReturnModalOpen(false)} className="text-gray-400 hover:text-charcoal bg-transparent border-none cursor-pointer">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleReturnSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* Order Item Summary */}
+              <div className="bg-[#FAF6F0] p-3 rounded border border-gray-200 text-xs flex justify-between items-center">
+                <div>
+                  <strong className="text-charcoal block">{selectedOrderForReturn.items?.[0]?.name || 'Jewellery Item'}</strong>
+                  <span className="text-gray-500">Sold by {selectedOrderForReturn.sellerName}</span>
+                </div>
+                <strong className="text-gold-dark text-sm">₹{(selectedOrderForReturn.totalAmount || 0).toLocaleString('en-IN')}</strong>
+              </div>
+
+              {/* Select Reason */}
+              <div>
+                <label className="block text-xs font-semibold text-charcoal uppercase mb-1">Reason for Return *</label>
+                <select
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                  className="input-field w-full text-sm"
+                  required
+                >
+                  <option value="Defective or Damaged Item">Defective or Damaged Item</option>
+                  <option value="Wrong Size / Fit Issue">Wrong Size / Fit Issue</option>
+                  <option value="Metal Purity / Gemstone Mismatch">Metal Purity / Gemstone Mismatch</option>
+                  <option value="Item Not as Described">Item Not as Described</option>
+                  <option value="Changed Mind / Expectation Mismatch">Changed Mind / Expectation Mismatch</option>
+                </select>
+              </div>
+
+              {/* Additional Comments */}
+              <div>
+                <label className="block text-xs font-semibold text-charcoal uppercase mb-1">Details & Remarks *</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Describe reason for return, condition of item & packaging..."
+                  value={returnComments}
+                  onChange={(e) => setReturnComments(e.target.value)}
+                  className="input-field w-full text-sm"
+                />
+              </div>
+
+              {/* Refund Method Selection */}
+              <div>
+                <label className="block text-xs font-semibold text-charcoal uppercase mb-1">Select Refund Payout Method *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+                  {[
+                    { id: 'Original Payment Source', label: 'Original Source' },
+                    { id: 'UPI', label: 'UPI Handle' },
+                    { id: 'Direct Bank Transfer', label: 'Bank Account' }
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setRefundMethod(m.id)}
+                      className={`p-2.5 text-xs rounded border text-center font-medium cursor-pointer transition-colors ${
+                        refundMethod === m.id
+                          ? 'border-gold bg-[#F5E7D6] text-gold-dark font-bold'
+                          : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* UPI ID Input */}
+              {refundMethod === 'UPI' && (
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded">
+                  <label className="block text-xs font-semibold text-charcoal uppercase mb-1">Your UPI ID *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. name@okicici or mobile@paytm"
+                    value={upiId}
+                    onChange={(e) => setUpiId(e.target.value)}
+                    className="input-field w-full text-sm font-mono"
+                  />
+                </div>
+              )}
+
+              {/* Direct Bank Details Inputs */}
+              {refundMethod === 'Direct Bank Transfer' && (
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-charcoal uppercase mb-1">Account Holder Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Name as in bank passbook"
+                      value={bankAccountDetails.accountHolder}
+                      onChange={(e) => setBankAccountDetails({ ...bankAccountDetails, accountHolder: e.target.value })}
+                      className="input-field w-full text-sm"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-charcoal uppercase mb-1">Bank Account Number *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Account Number"
+                        value={bankAccountDetails.accountNumber}
+                        onChange={(e) => setBankAccountDetails({ ...bankAccountDetails, accountNumber: e.target.value })}
+                        className="input-field w-full text-sm font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-charcoal uppercase mb-1">IFSC Code *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. HDFC0001234"
+                        value={bankAccountDetails.ifscCode}
+                        onChange={(e) => setBankAccountDetails({ ...bankAccountDetails, ifscCode: e.target.value.toUpperCase() })}
+                        className="input-field w-full text-sm font-mono uppercase"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Return Policy Notice */}
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded text-[0.7rem] text-amber-900 leading-relaxed">
+                <strong className="block mb-0.5 text-amber-950 font-bold">14-Day Insured Return Conditions:</strong>
+                Item must be returned with unbroken tamper security tag, original BIS hallmark certificate, and original box packaging. Pickup is insured.
+              </div>
+
+              <div className="pt-3 flex justify-end gap-3 border-t border-gray-100">
+                <button type="button" onClick={() => setIsReturnModalOpen(false)} className="btn-outline py-2.5 px-4 text-xs">
+                  Cancel
+                </button>
+                <button type="submit" className="btn-gold py-2.5 px-6 text-xs font-semibold flex items-center gap-1.5">
+                  <RotateCcw size={14} /> SUBMIT RETURN REQUEST
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: CANCEL ORDER MODAL */}
+      {isCancelModalOpen && selectedOrderForCancel && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-sm shadow-2xl border border-rose-300 overflow-hidden animate-fadeIn">
+            <div className="p-4 border-b border-rose-100 flex items-center justify-between bg-rose-50">
+              <div className="flex items-center gap-2">
+                <XCircle size={20} className="text-rose-600" />
+                <h3 className="font-heading text-lg text-rose-900">Cancel Order {selectedOrderForCancel.id}</h3>
+              </div>
+              <button onClick={() => setIsCancelModalOpen(false)} className="text-gray-400 hover:text-charcoal bg-transparent border-none cursor-pointer">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCancelSubmit} className="p-6 space-y-4">
+              <p className="text-xs text-gray-600">
+                Are you sure you want to cancel order <strong>{selectedOrderForCancel.id}</strong>? If already paid, refund will be initiated to your original payment mode within 24 hours.
+              </p>
+
+              <div>
+                <label className="block text-xs font-semibold text-charcoal uppercase mb-1">Reason for Cancellation</label>
+                <select
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="input-field w-full text-sm"
+                >
+                  <option value="Changed my mind / Placed by mistake">Changed my mind / Placed by mistake</option>
+                  <option value="Ordered alternative item">Ordered alternative item</option>
+                  <option value="Delivery time too long">Delivery time too long</option>
+                  <option value="Found better deal elsewhere">Found better deal elsewhere</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
+                <button type="button" onClick={() => setIsCancelModalOpen(false)} className="btn-outline py-2 px-4 text-xs">
+                  Keep Order
+                </button>
+                <button type="submit" className="py-2 px-5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded cursor-pointer">
+                  CONFIRM CANCELLATION
                 </button>
               </div>
             </form>

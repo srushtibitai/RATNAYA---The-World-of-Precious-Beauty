@@ -18,6 +18,7 @@ import { ShippingPolicyPage } from './components/ShippingPolicyPage';
 import { TermsPage } from './components/TermsPage';
 import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
 import { FaqPage } from './components/FaqPage';
+import { PolicyPages } from './components/PolicyPages';
 import { SearchModal } from './components/SearchModal';
 import { CartDrawer } from './components/CartDrawer';
 import { WishlistDrawer } from './components/WishlistDrawer';
@@ -401,6 +402,12 @@ export default function App() {
           />
         ) : activeTab === 'contact' ? (
           <ContactPage />
+        ) : activeTab === 'return-policy' || activeTab === 'returns' ? (
+          <PolicyPages
+            initialTab="return-policy"
+            onNavigateShop={() => setActiveTab('shop')}
+            onNavigateContact={() => setActiveTab('contact')}
+          />
         ) : activeTab === 'shipping-policy' ? (
           <ShippingPolicyPage
             onNavigateShop={() => setActiveTab('shop')}
