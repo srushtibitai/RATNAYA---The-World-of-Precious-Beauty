@@ -77,8 +77,8 @@ export const SELLERS = [
     productsCount: 64,
     verified: true,
     joinedDate: '2023-04-12',
-    logo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-    banner: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&q=80&w=1200',
+    logo: '/uploads/avatar.jpg',
+    banner: '/uploads/banner.jpg',
     about: 'Master artisans of authentic Jadau, Kundan, and Meenakari heritage jewellery from Johari Bazaar, Jaipur for 3 generations.',
     gst: '08AAAAA0000A1Z5',
     pan: 'ABCDE1234F',
@@ -95,8 +95,8 @@ export const SELLERS = [
     productsCount: 92,
     verified: true,
     joinedDate: '2022-11-05',
-    logo: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=200',
-    banner: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&q=80&w=1200',
+    logo: '/uploads/avatar.jpg',
+    banner: '/uploads/banner.jpg',
     about: 'Contemporary GIA-certified diamond creations, engagement solitaires, and red carpet high jewellery atelier based in BKC Mumbai.',
     gst: '27BBBBB1111B1Z9',
     pan: 'XYZPD9876Q',
@@ -113,8 +113,8 @@ export const SELLERS = [
     productsCount: 41,
     verified: true,
     joinedDate: '2023-08-20',
-    logo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
-    banner: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&q=80&w=1200',
+    logo: '/uploads/avatar.jpg',
+    banner: '/uploads/banner.jpg',
     about: 'Intricate Bengali handcrafted 22K light-weight gold filigree & traditional Nakshi work.',
     gst: '19CCCCC2222C1Z3',
     pan: 'KLMNO5432R',
@@ -131,8 +131,8 @@ export const SELLERS = [
     productsCount: 38,
     verified: true,
     joinedDate: '2024-01-15',
-    logo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200',
-    banner: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&q=80&w=1200',
+    logo: '/uploads/avatar.jpg',
+    banner: '/uploads/banner.jpg',
     about: 'Authentic Hyderabadi Nizam era un-cut diamond Polki & Basra pearl heirlooms.',
     gst: '36DDDDD3333D1Z1',
     pan: 'PRSTU7890S',
@@ -1687,23 +1687,7 @@ export const MOCK_ORDERS = [
   }
 ];
 
-export const MOCK_PENDING_SELLERS = [
-  {
-    id: 'seller-req-101',
-    businessName: 'Zaveri & Sons Heritage',
-    ownerName: 'Harish Zaveri',
-    email: 'contact@zaveriheritage.com',
-    phone: '+91 98210 55443',
-    city: 'Ahmedabad, Gujarat',
-    gst: '24AAAAZ9999Z1Z8',
-    pan: 'AZAPZ1234M',
-    category: 'Gold & Kundan Jewellery',
-    availableSizes: ['Standard'],
-    appliedDate: '2026-08-30',
-    kycStatus: 'Pending Verification',
-    kycDocuments: ['GST_Certificate.pdf', 'PAN_Card.jpg', 'BIS_Hallmark_License.pdf']
-  }
-];
+export const MOCK_PENDING_SELLERS = [];
 
 export const MOCK_PENDING_PRODUCTS = [
   {

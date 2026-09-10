@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PRODUCTS, SELLERS, MOCK_ORDERS } from '../data/marketplaceData';
-import { api } from '../services/api';
+import { api, openDocument, formatDocName } from '../services/api';
 import ImageModal from './ImageModal';
 import {
   LayoutDashboard,
@@ -33,38 +33,224 @@ import {
 } from 'lucide-react';
 
 export function SellerDashboardPage({ currentUser, sellerId }) {
-  const sellerFromData = SELLERS.find((s) => s.id === sellerId || s.id === currentUser?.id);
+  const sellerFromData = SELLERS.find((s) => s.id === sellerId || s.id === currentUser?.id || s.id === currentUser?.sellerId);
   const seller = currentUser ? {
-    id: currentUser.id || 'seller-custom',
-    name: currentUser.name || currentUser.businessName || 'Verified Jeweller',
-    owner: currentUser.owner || currentUser.name || 'Merchant Partner',
-    gst: currentUser.gst || '22AAAAA0000A1Z5',
+    id: currentUser.sellerId || currentUser.id || 'seller-custom',
+    name: currentUser.businessName || currentUser.name || '',
+    owner: currentUser.owner || currentUser.name || '',
+    email: currentUser.email || '',
+    phone: currentUser.phone || '',
+    city: currentUser.city || '',
+    gst: currentUser.gst || '',
+    pan: currentUser.pan || '',
+    bisLicense: currentUser.bisLicense || '',
+    about: currentUser.about || '',
     rating: 5.0,
     reviewsCount: 0,
     commissionRate: currentUser.commissionRate || 10,
-    logo: sellerFromData ? sellerFromData.logo : '/assets/jewellery/ring/1.jpg'
-  } : (sellerFromData || SELLERS[0]);
+    logo: currentUser.logo || (sellerFromData ? sellerFromData.logo : '/uploads/avatar.jpg'),
+    banner: currentUser.banner || (sellerFromData ? sellerFromData.banner : '/uploads/banner.jpg'),
+    status: currentUser.status || 'Pending Verification'
+  } : (sellerFromData || {
+    id: 'seller-custom',
+    name: '',
+    owner: '',
+    email: '',
+    phone: '',
+    city: '',
+    gst: '',
+    pan: '',
+    bisLicense: '',
+    logo: '/uploads/avatar.jpg',
+    banner: '/uploads/banner.jpg',
+    about: '',
+    status: 'Pending Verification'
+  });
 
-  const [activeTab, setActiveTab] = useState('overview');
-  const [sellerOrders, setSellerOrders] = useState(MOCK_ORDERS);
-  const [sellerProductsList, setSellerProductsList] = useState(() =>
-    PRODUCTS.filter((p) => p.sellerId === seller.id || p.sellerName === seller.name)
-  );
+  const [activeTab, setActiveTab] = useState(seller.status !== 'Approved' ? 'store-profile' : 'overview');
+  const [sellerOrders, setSellerOrders] = useState([]);
+  const [sellerProductsList, setSellerProductsList] = useState([]);
 
-  // Load Orders for Seller
+  // Seller Profile State
+  const [sellerProfile, setSellerProfile] = useState({
+    name: seller.name || '',
+    owner: seller.owner || '',
+    city: seller.city || '',
+    phone: seller.phone || '',
+    email: seller.email || '',
+    gst: seller.gst || '',
+    pan: seller.pan || '',
+    bisLicense: seller.bisLicense || '',
+    gstDoc: seller.gstDoc || '/uploads/GST_Certificate.pdf',
+    panDoc: seller.panDoc || '/uploads/PAN_Card.jpg',
+    bisDoc: seller.bisDoc || '/uploads/BIS_Hallmark_License.pdf',
+    logo: seller.logo || '',
+    banner: seller.banner || '',
+    about: seller.about || '',
+    status: seller.status || 'Pending Verification'
+  });
+  const [isProfileSavedToast, setIsProfileSavedToast] = useState(false);
+  const [docVerification, setDocVerification] = useState({ gst: null, pan: null, bis: null });
+  const [verifyingDoc, setVerifyingDoc] = useState({ gst: false, pan: false, bis: false });
+
+  const handleVerifyDocument = async (type) => {
+    const docNum = type === 'gst' ? sellerProfile.gst : type === 'pan' ? sellerProfile.pan : sellerProfile.bisLicense;
+    if (!docNum) {
+      setDocVerification((prev) => ({
+        ...prev,
+        [type]: { success: false, message: 'Please enter a number to verify' }
+      }));
+      return;
+    }
+
+    setVerifyingDoc((prev) => ({ ...prev, [type]: true }));
+    try {
+      const res = await api.verifySellerDocument(type, docNum);
+      if (res && res.verified) {
+        setDocVerification((prev) => ({
+          ...prev,
+          [type]: { success: true, message: res.message, details: res.details }
+        }));
+      } else {
+        setDocVerification((prev) => ({
+          ...prev,
+          [type]: { success: false, message: res?.message || 'Invalid format.' }
+        }));
+      }
+    } catch (err) {
+      setDocVerification((prev) => ({
+        ...prev,
+        [type]: { success: false, message: err.message || 'Verification failed.' }
+      }));
+    } finally {
+      setVerifyingDoc((prev) => ({ ...prev, [type]: false }));
+    }
+  };
+
+  // Fetch Seller Info & Verification Status from Database API
   useEffect(() => {
-    async function loadOrders() {
+    let isMounted = true;
+    async function loadSellerInfo() {
+      const targetId = currentUser?.sellerId || currentUser?.id || sellerId;
+      if (!targetId) return;
+
       try {
-        const res = await api.getOrders();
-        if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+        const res = await api.getSellerById(targetId);
+        if (isMounted && res && res.success && res.data) {
+          const sData = res.data;
+          setSellerProfile({
+            name: sData.name || sData.businessName || currentUser?.businessName || currentUser?.name || '',
+            owner: sData.owner || sData.ownerName || currentUser?.name || '',
+            city: sData.city || currentUser?.city || '',
+            phone: sData.phone || currentUser?.phone || '',
+            email: sData.email || currentUser?.email || '',
+            gst: sData.gst || currentUser?.gst || '',
+            pan: sData.pan || currentUser?.pan || '',
+            bisLicense: sData.bisLicense || currentUser?.bisLicense || '',
+            gstDoc: sData.gstDoc || currentUser?.gstDoc || '/uploads/GST_Certificate.pdf',
+            panDoc: sData.panDoc || currentUser?.panDoc || '/uploads/PAN_Card.jpg',
+            bisDoc: sData.bisDoc || currentUser?.bisDoc || '/uploads/BIS_Hallmark_License.pdf',
+            logo: sData.logo || currentUser?.logo || '',
+            banner: sData.banner || currentUser?.banner || '',
+            about: sData.about || currentUser?.about || '',
+            status: sData.status || currentUser?.status || 'Pending Verification'
+          });
+
+          if (sData.status !== 'Approved') {
+            setActiveTab('store-profile');
+          }
+        }
+      } catch (err) {
+        console.warn('Seller info load notice:', err);
+      }
+    }
+
+    loadSellerInfo();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.id, currentUser?.sellerId]);
+
+  // Load Products belonging ONLY to this Seller
+  useEffect(() => {
+    let isMounted = true;
+    async function loadSellerProducts() {
+      try {
+        const res = await api.getSellerProducts();
+        if (isMounted && res && res.success && Array.isArray(res.data)) {
+          setSellerProductsList(res.data);
+        } else if (isMounted) {
+          const filtered = PRODUCTS.filter(
+            (p) => p.sellerId === seller.id || p.sellerName === seller.name || (currentUser?.email && p.sellerEmail === currentUser.email)
+          );
+          setSellerProductsList(filtered);
+        }
+      } catch (err) {
+        console.warn('Seller products API load error:', err);
+      }
+    }
+    loadSellerProducts();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, seller.id, seller.name]);
+
+  // Load Seller Scoped Orders
+  useEffect(() => {
+    let isMounted = true;
+    async function loadSellerOrders() {
+      try {
+        const res = await api.getSellerOrders();
+        if (isMounted && res && res.success && Array.isArray(res.data)) {
           setSellerOrders(res.data);
         }
       } catch (err) {
-        console.warn('Seller orders API load fallback:', err);
+        console.warn('Seller orders API load error:', err);
       }
     }
-    loadOrders();
+    loadSellerOrders();
+    return () => {
+      isMounted = false;
+    };
   }, [activeTab]);
+
+  const handleSaveSellerProfile = async (e) => {
+    e.preventDefault();
+    const targetId = seller?.id || seller?._id || currentUser?.sellerId || currentUser?.id;
+
+    try {
+      const res = await api.updateSellerProfile(targetId, {
+        ...sellerProfile,
+        status: sellerProfile.status === 'Approved' ? 'Approved' : 'Pending Verification'
+      });
+
+      if (res && res.success && res.data) {
+        setSellerProfile(res.data);
+      }
+    } catch (err) {
+      console.warn('Seller profile API update error:', err);
+    }
+
+    if (currentUser) {
+      const updatedUser = {
+        ...currentUser,
+        name: sellerProfile.name,
+        businessName: sellerProfile.name,
+        owner: sellerProfile.owner,
+        phone: sellerProfile.phone,
+        city: sellerProfile.city,
+        gst: sellerProfile.gst,
+        pan: sellerProfile.pan,
+        bisLicense: sellerProfile.bisLicense,
+        status: sellerProfile.status === 'Approved' ? 'Approved' : 'Pending Verification'
+      };
+      localStorage.setItem('ratnaya_user', JSON.stringify(updatedUser));
+    }
+
+    setIsProfileSavedToast(true);
+    setTimeout(() => setIsProfileSavedToast(false), 3500);
+  };
+
 
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     try {
@@ -105,23 +291,20 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
   const [editingProduct, setEditingProduct] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const handleImageFileUpload = async (file, callback, categoryName = 'general') => {
+  const handleImageFileUpload = async (file, callback, categoryName = 'general', docType = '') => {
     if (!file) return;
     setIsUploading(true);
     try {
-      const res = await api.uploadImage(file, categoryName);
+      const sellerName = sellerProfile?.name || seller?.name || sellerProfile?.businessName || 'Seller';
+      const res = await api.uploadImage(file, categoryName, sellerName, docType);
       if (res && res.success && res.url) {
         callback(res.url);
       } else {
-        const reader = new FileReader();
-        reader.onloadend = () => callback(reader.result);
-        reader.readAsDataURL(file);
+        alert(res?.message || 'File upload failed. Please try again.');
       }
     } catch (err) {
-      console.warn('Image upload fallback:', err);
-      const reader = new FileReader();
-      reader.onloadend = () => callback(reader.result);
-      reader.readAsDataURL(file);
+      console.error('File upload error:', err);
+      alert('Error uploading file to server.');
     } finally {
       setIsUploading(false);
     }
@@ -211,8 +394,16 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
 
   const handleAddProductSubmit = async (e) => {
     e.preventDefault();
+
+    if (sellerProfile.status !== 'Approved') {
+      alert('⚠️ Account Verification Required: Your Seller Account must be approved by Ratnaya Admin before you can submit products.');
+      setActiveTab('store-profile');
+      return;
+    }
+
     const primaryImg = newProduct.image || '/assets/jewellery/necklace/1.jpg';
     const secondaryImg = newProduct.image2 || primaryImg;
+
 
     const createdProduct = {
       id: `prod-req-${Date.now()}`,
@@ -274,31 +465,50 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <img
-                src={seller.logo}
-                alt={seller.name}
-                className="w-12 h-12 rounded-full object-cover border-2 border-gold shrink-0"
+                src={api.getImageUrl(sellerProfile.logo || seller.logo || '/uploads/avatar.jpg')}
+                alt={sellerProfile.name}
+                className="w-12 h-12 rounded-full object-cover border-2 border-gold shrink-0 shadow-sm"
               />
               <div>
                 <span className="text-[0.68rem] text-gold tracking-widest uppercase font-semibold">
                   MERCHANT DASHBOARD
                 </span>
                 <h2 className="font-heading text-xl sm:text-2xl text-white">
-                  {seller.name}
+                  {sellerProfile.name}
                 </h2>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-2.5">
-              <span className="badge-gold text-xs">GST: {seller.gst}</span>
-              <span className="badge-approved text-xs flex items-center gap-1">
-                <CheckCircle2 size={12} /> Account Approved
-              </span>
+              <span className="badge-gold text-xs">GST: {sellerProfile.gst || 'Not Submitted'}</span>
+              {sellerProfile.status === 'Approved' ? (
+                <span className="bg-emerald-600 text-white text-xs px-2.5 py-1 rounded font-semibold flex items-center gap-1 shadow-xs">
+                  <CheckCircle2 size={12} /> Account Approved
+                </span>
+              ) : (
+                <span className="bg-amber-100 text-amber-900 border border-amber-300 text-xs px-2.5 py-1 rounded font-semibold flex items-center gap-1">
+                  <Clock size={12} /> Pending Verification
+                </span>
+              )}
             </div>
           </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        {/* Pending Verification Notice Banner */}
+        {sellerProfile.status !== 'Approved' && (
+          <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded text-amber-900 text-xs sm:text-sm flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-3">
+              <AlertCircle size={22} className="text-amber-600 shrink-0" />
+              <div>
+                <strong className="block text-amber-950 font-bold">Seller Account Approval Pending Admin Verification</strong>
+                <span>Your account status is <strong>Pending Verification</strong>. Please complete your Store Profile details (GST, PAN, BIS License) below and submit for Admin review. Product creation is blocked until Admin approval.</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-8">
           {/* Sidebar */}
           <aside>
@@ -310,21 +520,34 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                 { id: 'orders', label: 'Merchant Orders', icon: <ShoppingBag size={18} /> },
                 { id: 'earnings', label: 'Earnings & Payouts', icon: <DollarSign size={18} /> },
                 { id: 'store-profile', label: 'Store Profile', icon: <Store size={18} /> }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`w-full text-left p-3.5 text-xs sm:text-sm flex items-center gap-3 whitespace-nowrap border-b border-gray-100 transition-colors cursor-pointer ${
-                    activeTab === tab.id
-                      ? 'bg-[#FAF6F0] text-gold-dark font-semibold border-l-4 border-l-gold'
-                      : 'text-charcoal hover:bg-gray-50 bg-transparent'
-                  }`}
-                >
-                  {tab.icon} {tab.label}
-                </button>
-              ))}
+              ].map((tab) => {
+                const isBlocked = tab.id === 'add-product' && sellerProfile.status !== 'Approved';
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      if (isBlocked) {
+                        alert('⚠️ Account Verification Required: Your Seller Account is currently pending Admin approval. You cannot add products until Admin verifies your Store Profile and business documents.');
+                        setActiveTab('store-profile');
+                        return;
+                      }
+                      setActiveTab(tab.id);
+                    }}
+                    className={`w-full text-left p-3.5 text-xs sm:text-sm flex items-center gap-3 whitespace-nowrap border-b border-gray-100 transition-colors cursor-pointer ${
+                      activeTab === tab.id
+                        ? 'bg-[#FAF6F0] text-gold-dark font-semibold border-l-4 border-l-gold'
+                        : isBlocked
+                        ? 'text-gray-400 bg-gray-50 hover:bg-gray-100'
+                        : 'text-charcoal hover:bg-gray-50 bg-transparent'
+                    }`}
+                  >
+                    {tab.icon} {tab.label} {isBlocked && <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">LOCKED</span>}
+                  </button>
+                );
+              })}
             </div>
           </aside>
+
 
           {/* Main Dashboard Content */}
           <main className="min-w-0">
@@ -650,7 +873,7 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                                   onChange={(e) => {
                                     const file = e.target.files && e.target.files[0];
                                     if (file) {
-                                      handleImageFileUpload(file, (url) => setNewProduct((prev) => ({ ...prev, image: url })));
+                                      handleImageFileUpload(file, (url) => setNewProduct((prev) => ({ ...prev, image: url })), newProduct.category || 'bracelet');
                                     }
                                   }}
                                 />
@@ -718,7 +941,7 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                                   onChange={(e) => {
                                     const file = e.target.files && e.target.files[0];
                                     if (file) {
-                                      handleImageFileUpload(file, (url) => setNewProduct((prev) => ({ ...prev, image2: url })));
+                                      handleImageFileUpload(file, (url) => setNewProduct((prev) => ({ ...prev, image2: url })), newProduct.category || 'bracelet');
                                     }
                                   }}
                                 />
@@ -983,16 +1206,16 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
               </div>
             )}
 
-            {/* STORE PROFILE TAB */}
+            {/* STORE PROFILE & COMPLIANCE EDIT TAB */}
             {activeTab === 'store-profile' && (
               <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
                   <div>
                     <h3 className="font-heading text-2xl text-charcoal mb-1">
-                      Merchant Store Profile & Compliance
+                      Merchant Store Profile & Verification Settings
                     </h3>
                     <p className="text-xs sm:text-sm text-gray-500">
-                      Your verified jeweller credentials, GSTIN, and BIS Hallmarking license status.
+                      Update your store avatar logo, trade name, owner details, GSTIN, and BIS Hallmarking license credentials.
                     </p>
                   </div>
                   <span className="badge-approved text-xs flex items-center gap-1">
@@ -1000,27 +1223,418 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="bg-[#FAF6F0] p-5 border border-gray-200 rounded-sm space-y-3">
-                    <h4 className="font-heading text-lg text-charcoal border-b border-gray-200 pb-2">Business Information</h4>
-                    <div className="text-xs space-y-2 text-gray-700">
-                      <p><strong>Merchant Name:</strong> {seller.name}</p>
-                      <p><strong>Owner / Goldsmith:</strong> {seller.owner}</p>
-                      <p><strong>Base City:</strong> {seller.city || 'Jaipur, Rajasthan'}</p>
-                      <p><strong>GST Number:</strong> <code className="bg-white px-1.5 py-0.5 rounded font-mono">{seller.gst}</code></p>
+                {/* Toast Notification */}
+                {isProfileSavedToast && (
+                  <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-sm text-xs sm:text-sm font-medium flex items-center gap-2 shadow-xs animate-fadeIn">
+                    <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                    <span>Your merchant store profile, avatar logo, and compliance credentials have been updated!</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveSellerProfile} className="space-y-6">
+                  {/* Avatar Logo & Banner Upload */}
+                  <div className="bg-[#FAF6F0] p-5 rounded border border-gray-200 space-y-4">
+                    <h4 className="font-heading text-lg text-charcoal border-b border-gray-200/60 pb-2">
+                      1. Store Branding & Profile Avatar
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Avatar Logo */}
+                      <div className="flex items-start gap-4">
+                        <img
+                          src={api.getImageUrl(sellerProfile.logo || '/uploads/avatar.jpg')}
+                          alt="Store Logo"
+                          className="w-20 h-20 rounded-full object-cover border-2 border-gold shrink-0 shadow-md"
+                        />
+                        <div className="space-y-2 flex-1">
+                          <label className="text-xs font-semibold uppercase text-charcoal block">Profile Logo Avatar</label>
+                          <label className="btn-gold py-1.5 px-3 text-xs cursor-pointer inline-flex items-center gap-1.5">
+                            <Upload size={14} /> Upload New Logo
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files && e.target.files[0];
+                                if (file) {
+                                  handleImageFileUpload(file, (url) => setSellerProfile((prev) => ({ ...prev, logo: url })));
+                                }
+                              }}
+                            />
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Image URL..."
+                            value={sellerProfile.logo}
+                            onChange={(e) => setSellerProfile({ ...sellerProfile, logo: e.target.value })}
+                            className="input-field text-xs bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Store Banner */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold uppercase text-charcoal block">Storefront Header Banner</label>
+                        <div className="h-16 w-full rounded border border-gray-300 overflow-hidden bg-gray-100 mb-2 relative">
+                          <img src={api.getImageUrl(sellerProfile.banner || '/uploads/banner.jpg')} alt="Store Banner" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="btn-outline-gold py-1.5 px-3 text-xs cursor-pointer inline-flex items-center gap-1.5 bg-white">
+                            <Upload size={14} /> Upload Banner
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files && e.target.files[0];
+                                if (file) {
+                                  handleImageFileUpload(file, (url) => setSellerProfile((prev) => ({ ...prev, banner: url })));
+                                }
+                              }}
+                            />
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Banner Image URL..."
+                            value={sellerProfile.banner}
+                            onChange={(e) => setSellerProfile({ ...sellerProfile, banner: e.target.value })}
+                            className="input-field text-xs bg-white flex-1"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="bg-[#FAF6F0] p-5 border border-gray-200 rounded-sm space-y-3">
-                    <h4 className="font-heading text-lg text-charcoal border-b border-gray-200 pb-2">Quality & Governance</h4>
-                    <div className="text-xs space-y-2 text-gray-700">
-                      <p><strong>BIS Hallmark License:</strong> <span className="text-emerald-700 font-bold">Verified Active (HUID Compliant)</span></p>
-                      <p><strong>Jeweller Rating:</strong> ⭐ {seller.rating} / 5.0</p>
-                      <p><strong>Marketplace Commission Rate:</strong> {seller.commissionRate || 10}%</p>
-                      <p><strong>Account Status:</strong> <span className="badge-approved text-[0.68rem]">Active Merchant</span></p>
+                  {/* Business & Contact Details */}
+                  <div className="space-y-4">
+                    <h4 className="font-heading text-lg text-charcoal border-b border-gray-200 pb-2">
+                      2. Merchant & Business Details
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Store / Business Name *</label>
+                        <input
+                          type="text"
+                          required
+                          value={sellerProfile.name}
+                          onChange={(e) => setSellerProfile({ ...sellerProfile, name: e.target.value })}
+                          className="input-field text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Owner / Director Name *</label>
+                        <input
+                          type="text"
+                          required
+                          value={sellerProfile.owner}
+                          onChange={(e) => setSellerProfile({ ...sellerProfile, owner: e.target.value })}
+                          className="input-field text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Primary City / Base *</label>
+                        <input
+                          type="text"
+                          required
+                          value={sellerProfile.city}
+                          onChange={(e) => setSellerProfile({ ...sellerProfile, city: e.target.value })}
+                          className="input-field text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Contact Phone *</label>
+                        <input
+                          type="tel"
+                          required
+                          placeholder="e.g. 9829012345"
+                          value={sellerProfile.phone}
+                          onChange={(e) => setSellerProfile({ ...sellerProfile, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                          className="input-field font-mono text-sm"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Business Email Address *</label>
+                        <input
+                          type="email"
+                          required
+                          value={sellerProfile.email}
+                          onChange={(e) => setSellerProfile({ ...sellerProfile, email: e.target.value })}
+                          className="input-field text-sm"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+
+                  {/* Compliance & License Identifiers */}
+                  <div className="space-y-4 pt-2">
+                    <h4 className="font-heading text-lg text-charcoal border-b border-gray-200 pb-2">
+                      3. Verified Compliance & License Credentials
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* GSTIN Number */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold uppercase text-gray-700 block">GSTIN Number *</label>
+                          {docVerification.gst?.success ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              <CheckCircle2 size={10} /> Verified
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-400">15 Chars (e.g. 24AAAAA0000A1Z5)</span>
+                          )}
+                        </div>
+                        <div className="relative flex items-center">
+                          <input
+                            type="text"
+                            required
+                            placeholder="24AAAAA0000A1Z5"
+                            value={sellerProfile.gst}
+                            onChange={(e) => {
+                              setSellerProfile({ ...sellerProfile, gst: e.target.value.toUpperCase() });
+                              setDocVerification((prev) => ({ ...prev, gst: null }));
+                            }}
+                            className={`input-field font-mono uppercase text-sm pr-20 ${
+                              docVerification.gst?.success
+                                ? 'border-emerald-500 bg-emerald-50/20'
+                                : docVerification.gst?.success === false
+                                ? 'border-rose-400 bg-rose-50/20'
+                                : ''
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            disabled={verifyingDoc.gst || !sellerProfile.gst}
+                            onClick={() => handleVerifyDocument('gst')}
+                            className="absolute right-1 px-2.5 py-1 text-xs font-semibold rounded bg-gold/15 text-charcoal hover:bg-gold hover:text-white transition-colors disabled:opacity-50"
+                          >
+                            {verifyingDoc.gst ? 'Verifying...' : docVerification.gst?.success ? 'Re-Verify' : 'Verify'}
+                          </button>
+                        </div>
+                        {docVerification.gst && (
+                          <p className={`text-[11px] ${docVerification.gst.success ? 'text-emerald-700 font-medium' : 'text-rose-600 font-medium'}`}>
+                            {docVerification.gst.message}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* PAN Card Number */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold uppercase text-gray-700 block">PAN Card Number *</label>
+                          {docVerification.pan?.success ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              <CheckCircle2 size={10} /> Verified
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-400">10 Chars (e.g. ABCDE1234F)</span>
+                          )}
+                        </div>
+                        <div className="relative flex items-center">
+                          <input
+                            type="text"
+                            required
+                            placeholder="ABCDE1234F"
+                            value={sellerProfile.pan}
+                            onChange={(e) => {
+                              setSellerProfile({ ...sellerProfile, pan: e.target.value.toUpperCase() });
+                              setDocVerification((prev) => ({ ...prev, pan: null }));
+                            }}
+                            className={`input-field font-mono uppercase text-sm pr-20 ${
+                              docVerification.pan?.success
+                                ? 'border-emerald-500 bg-emerald-50/20'
+                                : docVerification.pan?.success === false
+                                ? 'border-rose-400 bg-rose-50/20'
+                                : ''
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            disabled={verifyingDoc.pan || !sellerProfile.pan}
+                            onClick={() => handleVerifyDocument('pan')}
+                            className="absolute right-1 px-2.5 py-1 text-xs font-semibold rounded bg-gold/15 text-charcoal hover:bg-gold hover:text-white transition-colors disabled:opacity-50"
+                          >
+                            {verifyingDoc.pan ? 'Verifying...' : docVerification.pan?.success ? 'Re-Verify' : 'Verify'}
+                          </button>
+                        </div>
+                        {docVerification.pan && (
+                          <p className={`text-[11px] ${docVerification.pan.success ? 'text-emerald-700 font-medium' : 'text-rose-600 font-medium'}`}>
+                            {docVerification.pan.message}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* BIS Hallmark License */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold uppercase text-gray-700 block">BIS Hallmark License *</label>
+                          {docVerification.bis?.success ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              <CheckCircle2 size={10} /> Verified
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-400">BIS Hallmark Cert</span>
+                          )}
+                        </div>
+                        <div className="relative flex items-center">
+                          <input
+                            type="text"
+                            required
+                            placeholder="BIS98765432"
+                            value={sellerProfile.bisLicense}
+                            onChange={(e) => {
+                              setSellerProfile({ ...sellerProfile, bisLicense: e.target.value.toUpperCase() });
+                              setDocVerification((prev) => ({ ...prev, bis: null }));
+                            }}
+                            className={`input-field font-mono uppercase text-sm pr-20 ${
+                              docVerification.bis?.success
+                                ? 'border-emerald-500 bg-emerald-50/20'
+                                : docVerification.bis?.success === false
+                                ? 'border-rose-400 bg-rose-50/20'
+                                : ''
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            disabled={verifyingDoc.bis || !sellerProfile.bisLicense}
+                            onClick={() => handleVerifyDocument('bis')}
+                            className="absolute right-1 px-2.5 py-1 text-xs font-semibold rounded bg-gold/15 text-charcoal hover:bg-gold hover:text-white transition-colors disabled:opacity-50"
+                          >
+                            {verifyingDoc.bis ? 'Verifying...' : docVerification.bis?.success ? 'Re-Verify' : 'Verify'}
+                          </button>
+                        </div>
+                        {docVerification.bis && (
+                          <p className={`text-[11px] ${docVerification.bis.success ? 'text-emerald-700 font-medium' : 'text-rose-600 font-medium'}`}>
+                            {docVerification.bis.message}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Submitted Compliance & KYC Proof Documents */}
+                      <div className="pt-3 border-t border-gray-200/80 space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block">
+                          SUBMITTED COMPLIANCE & KYC PROOF DOCUMENTS:
+                        </label>
+                        <div className="flex flex-wrap items-center gap-3">
+                          {/* GST Certificate Pill */}
+                          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-300 bg-white shadow-2xs hover:border-gold transition-all text-xs text-charcoal">
+                            <span className="text-sm">📄</span>
+                            <span className="font-mono text-xs max-w-[170px] truncate font-medium">
+                              {formatDocName(sellerProfile.gstDoc, 'GST_Certificate.pdf')}
+                            </span>
+                            <label className="cursor-pointer text-gold hover:underline text-xs font-semibold ml-1">
+                              Upload
+                              <input
+                                type="file"
+                                accept="image/*,application/pdf"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files && e.target.files[0];
+                                  if (file) {
+                                    handleImageFileUpload(file, (url) => setSellerProfile((prev) => ({ ...prev, gstDoc: url })), 'documents', 'GST_Certificate');
+                                  }
+                                }}
+                              />
+                            </label>
+                            {sellerProfile.gstDoc && (
+                              <button
+                                type="button"
+                                onClick={() => openDocument(sellerProfile.gstDoc)}
+                                className="text-emerald-700 hover:text-emerald-900 font-semibold text-xs ml-1 bg-transparent border-0 cursor-pointer"
+                              >
+                                View
+                              </button>
+                            )}
+                          </div>
+
+                          {/* PAN Card Pill */}
+                          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-300 bg-white shadow-2xs hover:border-gold transition-all text-xs text-charcoal">
+                            <span className="text-sm">💳</span>
+                            <span className="font-mono text-xs max-w-[170px] truncate font-medium">
+                              {formatDocName(sellerProfile.panDoc, 'PAN_Card.jpg')}
+                            </span>
+                            <label className="cursor-pointer text-gold hover:underline text-xs font-semibold ml-1">
+                              Upload
+                              <input
+                                type="file"
+                                accept="image/*,application/pdf"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files && e.target.files[0];
+                                  if (file) {
+                                    handleImageFileUpload(file, (url) => setSellerProfile((prev) => ({ ...prev, panDoc: url })), 'documents', 'PAN_Card');
+                                  }
+                                }}
+                              />
+                            </label>
+                            {sellerProfile.panDoc && (
+                              <button
+                                type="button"
+                                onClick={() => openDocument(sellerProfile.panDoc)}
+                                className="text-emerald-700 hover:text-emerald-900 font-semibold text-xs ml-1 bg-transparent border-0 cursor-pointer"
+                              >
+                                View
+                              </button>
+                            )}
+                          </div>
+
+                          {/* BIS Hallmark License Pill */}
+                          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-300 bg-white shadow-2xs hover:border-gold transition-all text-xs text-charcoal">
+                            <span className="text-sm">🏆</span>
+                            <span className="font-mono text-xs max-w-[170px] truncate font-medium">
+                              {formatDocName(sellerProfile.bisDoc, 'BIS_Hallmark_License.pdf')}
+                            </span>
+                            <label className="cursor-pointer text-gold hover:underline text-xs font-semibold ml-1">
+                              Upload
+                              <input
+                                type="file"
+                                accept="image/*,application/pdf"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files && e.target.files[0];
+                                  if (file) {
+                                    handleImageFileUpload(file, (url) => setSellerProfile((prev) => ({ ...prev, bisDoc: url })), 'documents', 'BIS_Hallmark_License');
+                                  }
+                                }}
+                              />
+                            </label>
+                            {sellerProfile.bisDoc && (
+                              <button
+                                type="button"
+                                onClick={() => openDocument(sellerProfile.bisDoc)}
+                                className="text-emerald-700 hover:text-emerald-900 font-semibold text-xs ml-1 bg-transparent border-0 cursor-pointer"
+                              >
+                                View
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Story & Description */}
+                  <div className="pt-2">
+                    <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Atelier Heritage Story / Bio</label>
+                    <textarea
+                      rows={3}
+                      value={sellerProfile.about}
+                      onChange={(e) => setSellerProfile({ ...sellerProfile, about: e.target.value })}
+                      className="input-field text-sm"
+                    />
+                  </div>
+
+                  <div className="pt-4 flex justify-end">
+                    <button type="submit" className="btn-gold py-3.5 px-8 text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
+                      <ShieldCheck size={16} /> SAVE & UPDATE STORE PROFILE
+                    </button>
+                  </div>
+                </form>
               </div>
             )}
           </main>

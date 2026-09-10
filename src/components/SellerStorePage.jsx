@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SELLERS, PRODUCTS } from '../data/marketplaceData';
 import { ShieldCheck, Star, MapPin, Calendar, Heart, Eye, ShoppingBag, Store, Check } from 'lucide-react';
+import { api } from '../services/api';
 
 export function SellerStorePage({
   sellerId,
@@ -25,7 +26,7 @@ export function SellerStorePage({
       {/* Seller Header Hero Banner */}
       <div
         className="relative h-48 sm:h-64 bg-cover bg-center"
-        style={{ backgroundImage: `url(${seller.banner})` }}
+        style={{ backgroundImage: `url(${api.getImageUrl(seller.banner || '/uploads/banner.jpg')})` }}
       >
         <div className="absolute inset-0 bg-black/65" />
       </div>
@@ -35,7 +36,7 @@ export function SellerStorePage({
         <div className="bg-white border border-gold/40 rounded-sm p-6 sm:p-8 shadow-medium flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
             <img
-              src={seller.logo}
+              src={api.getImageUrl(seller.logo || '/uploads/avatar.jpg')}
               alt={seller.name}
               className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-white shadow-md shrink-0"
             />

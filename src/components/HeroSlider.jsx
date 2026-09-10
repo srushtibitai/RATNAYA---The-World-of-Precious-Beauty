@@ -69,8 +69,9 @@ export function HeroSlider({ onNavigateShop, onSelectCategory }) {
     let isMounted = true;
     async function loadDynamicBanners() {
       try {
-        const dbBanners = await api.getBanners();
-        if (isMounted && Array.isArray(dbBanners) && dbBanners.length > 0) {
+        const res = await api.getBanners();
+        const dbBanners = (res && res.data && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+        if (isMounted && dbBanners.length > 0) {
           const formatted = dbBanners.map((b, idx) => ({
             id: b.slideId || b._id || idx + 1,
             eyebrow: b.eyebrow || SWARNA_SLIDES[idx % 3].eyebrow,

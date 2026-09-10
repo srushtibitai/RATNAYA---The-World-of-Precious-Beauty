@@ -1,15 +1,26 @@
-import React, { useState } from 'react';
-import { ShieldCheck, Lock, CheckCircle2, ArrowRight, CreditCard, Smartphone, Building, Wallet, Truck, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShieldCheck, Lock, CheckCircle2, ArrowRight, CreditCard, Smartphone, Building, Wallet, Truck, Loader2, MapPin } from 'lucide-react';
 import { api } from '../services/api';
 
-export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
+export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop, currentUser }) {
   const [step, setStep] = useState('checkout'); // 'checkout' or 'success'
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState(null);
+
+  // Active Logged-in User
+  const activeUser = currentUser || (() => {
+    try {
+      const saved = localStorage.getItem('ratnaya_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  })();
+
   const [formData, setFormData] = useState({
-    fullName: 'Priya Malhotra',
-    email: 'priya.m@gmail.com',
-    phone: '+91 98201 44510',
+    fullName: activeUser?.name || 'Priya Malhotra',
+    email: activeUser?.email || 'priya.m@gmail.com',
+    phone: activeUser?.phone || '+91 98201 44510',
     address: 'Flat 402, Sea Pearl Towers',
     city: 'Mumbai',
     state: 'Maharashtra',
@@ -17,9 +28,71 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
     paymentMethod: 'upi'
   });
 
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+
+  // Fetch Database Profile & Addresses for Logged-In User
+  useEffect(() => {
+    let isMounted = true;
+    async function loadUserDatabaseProfile() {
+      const userId = activeUser?.id || activeUser?._id;
+      if (!userId) return;
+
+      try {
+        const res = await api.getProfile(userId);
+        if (isMounted && res) {
+          if (res.profile) {
+            setFormData((prev) => ({
+              ...prev,
+              fullName: res.profile.name || activeUser?.name || prev.fullName,
+              email: res.profile.email || activeUser?.email || prev.email,
+              phone: res.profile.phone || activeUser?.phone || prev.phone
+            }));
+          }
+
+          if (Array.isArray(res.addresses) && res.addresses.length > 0) {
+            setSavedAddresses(res.addresses);
+            const defaultAddr = res.addresses.find((a) => a.isDefault) || res.addresses[0];
+            if (defaultAddr) {
+              setSelectedAddressId(defaultAddr._id || defaultAddr.id);
+              setFormData((prev) => ({
+                ...prev,
+                address: defaultAddr.street || prev.address,
+                city: defaultAddr.city || prev.city,
+                state: defaultAddr.state || prev.state,
+                pincode: defaultAddr.pincode || prev.pincode,
+                phone: defaultAddr.phone || prev.phone
+              }));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Checkout profile load fallback:', err);
+      }
+    }
+
+    loadUserDatabaseProfile();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeUser?.id, activeUser?.email]);
+
+  const handleSelectAddress = (addr) => {
+    setSelectedAddressId(addr._id || addr.id);
+    setFormData((prev) => ({
+      ...prev,
+      address: addr.street || prev.address,
+      city: addr.city || prev.city,
+      state: addr.state || prev.state,
+      pincode: addr.pincode || prev.pincode,
+      phone: addr.phone || prev.phone
+    }));
+  };
+
   const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const gst = Math.round(subtotal * 0.03);
   const total = subtotal + gst;
+
 
   const handleSubmitOrder = async (e) => {
     e.preventDefault();
@@ -60,6 +133,32 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
           },
           handler: async function (response) {
             await api.verifyRazorpayPayment(response);
+
+            const orderPayload = {
+              buyerName: formData.fullName,
+              buyerEmail: formData.email,
+              buyerPhone: formData.phone,
+              address: `${formData.address}, ${formData.city}, ${formData.state} - ${formData.pincode}`,
+              totalAmount: total,
+              paymentMethod: formData.paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : 'Prepaid (UPI / Card)',
+              sellerName: cartItems[0]?.sellerName || 'Verified Jeweller',
+              sellerId: cartItems[0]?.sellerId || 'seller-1',
+              items: cartItems.map(i => ({
+                productId: i.id,
+                name: i.name,
+                price: i.price,
+                qty: i.quantity || 1,
+                sellerName: i.sellerName || 'Verified Jeweller',
+                sellerId: i.sellerId || 'seller-1'
+              }))
+            };
+
+            // Save Order to Backend DB & Send Nodemailer Email
+            try {
+              await api.createOrder(orderPayload);
+            } catch (orderErr) {
+              console.warn('Backend Order Creation Notice:', orderErr);
+            }
 
             // Create Live Order in Shiprocket
             try {
@@ -105,6 +204,32 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
         rzp.open();
       } else {
         setTimeout(async () => {
+          const orderPayload = {
+            buyerName: formData.fullName,
+            buyerEmail: formData.email,
+            buyerPhone: formData.phone,
+            address: `${formData.address}, ${formData.city}, ${formData.state} - ${formData.pincode}`,
+            totalAmount: total,
+            paymentMethod: formData.paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : 'Prepaid (UPI / Card)',
+            sellerName: cartItems[0]?.sellerName || 'Verified Jeweller',
+            sellerId: cartItems[0]?.sellerId || 'seller-1',
+            items: cartItems.map(i => ({
+              productId: i.id,
+              name: i.name,
+              price: i.price,
+              qty: i.quantity || 1,
+              sellerName: i.sellerName || 'Verified Jeweller',
+              sellerId: i.sellerId || 'seller-1'
+            }))
+          };
+
+          // Save Order to Backend DB & Send Nodemailer Email
+          try {
+            await api.createOrder(orderPayload);
+          } catch (orderErr) {
+            console.warn('Backend Order Creation Notice:', orderErr);
+          }
+
           // Create Live Order in Shiprocket
           try {
             await api.createShippingOrder({
@@ -285,7 +410,40 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop }) {
                 <h3 className="font-heading text-lg sm:text-xl mb-5">
                   2. Delivery Address
                 </h3>
+
+                {savedAddresses.length > 0 && (
+                  <div className="mb-5 pb-4 border-b border-gray-100">
+                    <label className="text-xs uppercase font-semibold text-gold-dark mb-2.5 flex items-center gap-1">
+                      <MapPin size={14} /> Select Saved Address From Your Account
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {savedAddresses.map((addr) => {
+                        const id = addr._id || addr.id;
+                        const isSelected = selectedAddressId === id;
+                        return (
+                          <div
+                            key={id}
+                            onClick={() => handleSelectAddress(addr)}
+                            className={`p-3 rounded border text-xs cursor-pointer transition-all ${
+                              isSelected ? 'border-gold bg-gold/10 font-semibold shadow-xs' : 'border-gray-200 hover:border-gold/50 bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="font-bold text-charcoal flex items-center gap-1">
+                                <MapPin size={12} className="text-gold-dark" /> {addr.type || 'Home'}
+                              </span>
+                              {addr.isDefault && <span className="bg-gold/20 text-gold-dark text-[10px] px-1.5 py-0.5 rounded font-semibold">DEFAULT</span>}
+                            </div>
+                            <p className="text-gray-600 line-clamp-2">{addr.street}, {addr.city}, {addr.state} - {addr.pincode}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-4">
+
                   <div>
                     <label className="text-xs uppercase font-semibold text-gray-500 mb-1.5 block">
                       Street Address / Flat / Building

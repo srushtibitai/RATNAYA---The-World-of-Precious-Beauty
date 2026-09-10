@@ -461,6 +461,7 @@ export default function App() {
         ) : activeTab === 'checkout' ? (
           <CheckoutPage
             cartItems={cartItems}
+            currentUser={currentUser}
             onOrderPlaced={() => {
               setCartItems([]);
               api.clearCart(effectiveUserId).catch(() => {});

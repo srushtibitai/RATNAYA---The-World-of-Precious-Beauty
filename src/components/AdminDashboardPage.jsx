@@ -26,7 +26,7 @@ import {
   AlertCircle,
   Trash2
 } from 'lucide-react';
-import { api } from '../services/api';
+import { api, openDocument, formatDocName } from '../services/api';
 
 export function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -35,20 +35,7 @@ export function AdminDashboardPage() {
   const [sellersList, setSellersList] = useState(INITIAL_SELLERS);
   const [adminOrders, setAdminOrders] = useState(MOCK_ORDERS);
   
-  const [pendingSellers, setPendingSellers] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('ratnaya_pending_sellers') || '[]');
-      const combined = [...saved];
-      MOCK_PENDING_SELLERS.forEach((item) => {
-        if (!combined.some((s) => s.id === item.id)) {
-          combined.push(item);
-        }
-      });
-      return combined;
-    } catch (e) {
-      return MOCK_PENDING_SELLERS;
-    }
-  });
+  const [pendingSellers, setPendingSellers] = useState([]);
 
   const [pendingProducts, setPendingProducts] = useState(() => {
     try {
@@ -74,14 +61,36 @@ export function AdminDashboardPage() {
     owner: '',
     email: '',
     phone: '',
-    city: 'Jaipur',
-    gst: '22AAAAA0000A1Z5',
-    pan: 'ABCDE1234F',
+    city: '',
+    gst: '',
+    pan: '',
     commissionRate: 10
   });
 
   // Sync pending products & sellers from Database API & localStorage on tab change or mount
   useEffect(() => {
+    async function syncBackendPendingSellers() {
+      try {
+        const res = await api.getPendingSellers();
+        if (res && res.success && Array.isArray(res.data)) {
+          setPendingSellers(res.data);
+        }
+      } catch (e) {
+        console.warn('Pending sellers API sync error:', e);
+      }
+    }
+
+    async function syncBackendVerifiedSellers() {
+      try {
+        const res = await api.getSellers();
+        if (res && res.success && Array.isArray(res.data)) {
+          setSellersList(res.data);
+        }
+      } catch (e) {
+        console.warn('Verified sellers API sync error:', e);
+      }
+    }
+
     async function syncBackendPendingProducts() {
       try {
         const res = await api.getPendingProducts();
@@ -112,23 +121,10 @@ export function AdminDashboardPage() {
       }
     }
 
+    syncBackendPendingSellers();
+    syncBackendVerifiedSellers();
     syncBackendPendingProducts();
     syncAdminOrders();
-
-    try {
-      const savedSellers = JSON.parse(localStorage.getItem('ratnaya_pending_sellers') || '[]');
-      if (savedSellers.length > 0) {
-        setPendingSellers((prev) => {
-          const updated = [...savedSellers];
-          prev.forEach((item) => {
-            if (!updated.some((s) => s.id === item.id)) {
-              updated.push(item);
-            }
-          });
-          return updated;
-        });
-      }
-    } catch (e) {}
   }, [activeTab]);
 
   // Handle Approve Return & Issue Refund by Admin
@@ -183,46 +179,105 @@ export function AdminDashboardPage() {
     }
   };
 
-  // Load Sellers from Backend API on mount
+  // Load Sellers and Pending Applications from Backend API on mount
   useEffect(() => {
     async function loadSellers() {
-      const res = await api.getSellers();
-      if (res.success && res.data && res.data.length > 0) {
-        setSellersList(res.data);
+      try {
+        const res = await api.getSellers();
+        if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setSellersList(res.data);
+        }
+      } catch (err) {
+        console.warn('Sellers API load error:', err);
+      }
+
+      try {
+        const pRes = await api.getPendingSellers();
+        if (pRes && pRes.success && Array.isArray(pRes.data)) {
+          setPendingSellers(pRes.data);
+        }
+      } catch (err) {
+        console.warn('Pending sellers API load error:', err);
       }
     }
     loadSellers();
   }, []);
 
-  const handleApproveSeller = (id) => {
-    const approvedItem = pendingSellers.find((s) => s.id === id);
+  const handleApproveSeller = async (id) => {
+    const approvedItem = pendingSellers.find((s) => s.id === id || s._id === id);
+
+    try {
+      await api.approveSeller(id);
+    } catch (err) {
+      console.error('Approve seller API error:', err);
+    }
+
     if (approvedItem) {
       const newSeller = {
-        id: `seller-${Date.now()}`,
-        name: approvedItem.businessName,
-        owner: approvedItem.ownerName,
-        city: approvedItem.city,
-        rating: 4.9,
+        id: approvedItem.id || `seller-${Date.now()}`,
+        name: approvedItem.businessName || approvedItem.name,
+        owner: approvedItem.ownerName || approvedItem.owner,
+        city: approvedItem.city || '',
+        phone: approvedItem.phone || '',
+        email: approvedItem.email || '',
+        rating: 5.0,
         reviewsCount: 0,
         productsCount: 0,
         verified: true,
-        joinedDate: '2026',
-        logo: '/assets/jewellery/ring/1.jpg',
-        banner: '/assets/jewellery/ring/1.jpg',
-        about: `${approvedItem.businessName} is a verified merchant.`,
-        gst: approvedItem.gst,
-        pan: 'ABCDE1234F',
+        joinedDate: new Date().getFullYear().toString(),
+        logo: approvedItem.logo || '',
+        banner: approvedItem.banner || '',
+        about: approvedItem.about || `${approvedItem.businessName || approvedItem.name || 'Jeweller'} is a verified merchant.`,
+        gst: approvedItem.gst || '',
+        pan: approvedItem.pan || '',
+        bisLicense: approvedItem.bisLicense || '',
         status: 'Approved',
         commissionRate: 10
       };
-      setSellersList([newSeller, ...sellersList]);
+      setSellersList((prev) => [newSeller, ...prev.filter((s) => s.id !== newSeller.id)]);
     }
-    const filtered = pendingSellers.filter((s) => s.id !== id);
+
+    const filtered = pendingSellers.filter((s) => s.id !== id && s._id !== id);
     setPendingSellers(filtered);
-    try {
-      localStorage.setItem('ratnaya_pending_sellers', JSON.stringify(filtered));
-    } catch (e) {}
   };
+
+  // Seller Rejection Modal State
+  const [sellerRejectModal, setSellerRejectModal] = useState({
+    isOpen: false,
+    seller: null,
+    reason: ''
+  });
+
+  const handleOpenSellerRejectModal = (s) => {
+    setSellerRejectModal({
+      isOpen: true,
+      seller: s,
+      reason: 'GST document verification or business compliance requirements were not met. Please re-upload valid documents.'
+    });
+  };
+
+  const handleConfirmRejectSeller = async (e) => {
+    e.preventDefault();
+    if (!sellerRejectModal.seller) return;
+
+    const sellerId = sellerRejectModal.seller.id || sellerRejectModal.seller._id;
+    const reason = sellerRejectModal.reason || 'Document verification or business compliance requirements were not met.';
+
+    try {
+      const res = await api.rejectSeller(sellerId, reason);
+      if (res && res.success) {
+        setPendingSellers((prev) => prev.filter((item) => item.id !== sellerId && item._id !== sellerId));
+        alert(`Seller application rejected successfully. ${res.emailSent ? '📧 Rejection email sent to seller!' : ''}`);
+        setSellerRejectModal({ isOpen: false, seller: null, reason: '' });
+      } else {
+        alert(res?.message || 'Failed to reject seller.');
+      }
+    } catch (err) {
+      console.error('Error rejecting seller:', err);
+      alert('Error sending seller rejection request.');
+    }
+  };
+
 
   // Product Rejection Modal State
   const [rejectModal, setRejectModal] = useState({
@@ -263,8 +318,17 @@ export function AdminDashboardPage() {
       localStorage.setItem('ratnaya_pending_products', JSON.stringify(filtered));
     } catch (err) {}
 
-    // Call API reject product with reason & timestamp
-    await api.rejectProduct(prodId, reason).catch((err) => console.error('API Reject Error:', err));
+    try {
+      const res = await api.rejectProduct(prodId, reason);
+      if (res && res.success) {
+        alert(`Product rejected successfully. ${res.emailSent ? '📧 Rejection email sent to seller!' : ''}`);
+      } else {
+        alert(res?.message || 'Product rejected.');
+      }
+    } catch (err) {
+      console.error('API Reject Error:', err);
+      alert('Error rejecting product request.');
+    }
 
     setRejectModal({ isOpen: false, product: null, reason: '' });
   };
@@ -567,29 +631,55 @@ export function AdminDashboardPage() {
                             <span className="badge-pending text-xs">{s.kycStatus}</span>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-gray-600">
-                            <div><strong>Owner Name:</strong> {s.ownerName}</div>
-                            <div><strong>City / State:</strong> {s.city}</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs text-gray-600">
+                            <div><strong>Owner Name:</strong> {s.ownerName || s.owner}</div>
+                            <div><strong>City / Base:</strong> {s.city || 'Jaipur'}</div>
                             <div><strong>Email:</strong> {s.email}</div>
                             <div><strong>Phone:</strong> {s.phone}</div>
-                            <div><strong>GST Number:</strong> <span className="font-mono text-charcoal font-semibold">{s.gst}</span></div>
-                            <div><strong>PAN Number:</strong> <span className="font-mono text-charcoal font-semibold">{s.pan}</span></div>
-                            <div><strong>Category:</strong> {s.category}</div>
-                            <div><strong>Applied Date:</strong> {s.appliedDate}</div>
+                            <div><strong>GSTIN Number:</strong> <span className="font-mono text-charcoal font-semibold">{s.gst || 'Not provided'}</span></div>
+                            <div><strong>PAN Card Number:</strong> <span className="font-mono text-charcoal font-semibold">{s.pan || 'Not provided'}</span></div>
+                            <div><strong>BIS Hallmark License:</strong> <span className="font-mono text-charcoal font-semibold">{s.bisLicense || 'BIS-HUID-992014'}</span></div>
+                            <div><strong>Applied Date:</strong> {s.appliedDate || 'Recent'}</div>
                           </div>
 
-                          {s.kycDocuments && (
-                            <div className="pt-2 border-t border-gray-200">
-                              <span className="text-[0.7rem] uppercase tracking-wider font-semibold text-gray-500 block mb-1.5">Submitted KYC Documents:</span>
-                              <div className="flex flex-wrap gap-2">
-                                {s.kycDocuments.map((doc, i) => (
-                                  <span key={i} className="text-xs bg-white border border-gray-300 px-2.5 py-1 rounded text-charcoal font-mono flex items-center gap-1">
-                                    📄 {doc}
-                                  </span>
-                                ))}
-                              </div>
+                          {/* Submitted KYC Proof Documents */}
+                          <div className="pt-3 border-t border-gray-200">
+                            <span className="text-[0.7rem] uppercase tracking-wider font-semibold text-gray-500 block mb-2">SUBMITTED COMPLIANCE & KYC PROOF DOCUMENTS:</span>
+                            <div className="flex flex-wrap items-center gap-3">
+                              {/* GST Certificate Pill */}
+                              <button
+                                type="button"
+                                onClick={() => openDocument(s.gstDoc || '/uploads/GST_Certificate.pdf')}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-gray-300 bg-white hover:border-gold hover:bg-[#FAF6F0] transition-all text-xs font-mono text-charcoal shadow-2xs font-medium cursor-pointer"
+                                title="Click to View / Download GST Certificate"
+                              >
+                                <span>📄</span>
+                                <span>{formatDocName(s.gstDoc, 'GST_Certificate.pdf')}</span>
+                              </button>
+
+                              {/* PAN Card Pill */}
+                              <button
+                                type="button"
+                                onClick={() => openDocument(s.panDoc || '/uploads/PAN_Card.jpg')}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-gray-300 bg-white hover:border-gold hover:bg-[#FAF6F0] transition-all text-xs font-mono text-charcoal shadow-2xs font-medium cursor-pointer"
+                                title="Click to View / Download PAN Card Proof"
+                              >
+                                <span>💳</span>
+                                <span>{formatDocName(s.panDoc, 'PAN_Card.jpg')}</span>
+                              </button>
+
+                              {/* BIS Hallmark License Pill */}
+                              <button
+                                type="button"
+                                onClick={() => openDocument(s.bisDoc || '/uploads/BIS_Hallmark_License.pdf')}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-gray-300 bg-white hover:border-gold hover:bg-[#FAF6F0] transition-all text-xs font-mono text-charcoal shadow-2xs font-medium cursor-pointer"
+                                title="Click to View / Download BIS Hallmark License Certificate"
+                              >
+                                <span>🏆</span>
+                                <span>{formatDocName(s.bisDoc, 'BIS_Hallmark_License.pdf')}</span>
+                              </button>
                             </div>
-                          )}
+                          </div>
                         </div>
 
                         {/* Approval Actions */}
@@ -601,8 +691,8 @@ export function AdminDashboardPage() {
                             <CheckCircle2 size={16} /> Approve & Onboard
                           </button>
                           <button
-                            onClick={() => setPendingSellers(pendingSellers.filter((p) => p.id !== s.id))}
-                            className="btn-outline w-full py-2.5 px-5 text-xs text-red-600 border-red-200 hover:bg-red-50 flex items-center justify-center gap-1.5"
+                            onClick={() => handleOpenSellerRejectModal(s)}
+                            className="btn-outline w-full py-2.5 px-5 text-xs text-red-600 border-red-200 hover:bg-red-50 flex items-center justify-center gap-1.5 cursor-pointer"
                           >
                             <XCircle size={16} /> Reject Application
                           </button>
@@ -878,7 +968,7 @@ export function AdminDashboardPage() {
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Phone</label>
-                  <input type="tel" required placeholder="+91 98290 12345" value={newSellerData.phone} onChange={(e) => setNewSellerData({ ...newSellerData, phone: e.target.value })} className="input-field" />
+                  <input type="tel" required placeholder="e.g. 9829012345" value={newSellerData.phone} onChange={(e) => setNewSellerData({ ...newSellerData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} className="input-field font-mono" />
                 </div>
               </div>
             </form>
@@ -950,6 +1040,86 @@ export function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setRejectModal({ isOpen: false, product: null, reason: '' })}
+                  className="btn-outline py-3 px-5 text-xs"
+                >
+                  CANCEL
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Seller Application Rejection Reason Modal */}
+      {sellerRejectModal.isOpen && sellerRejectModal.seller && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
+          <div className="bg-white p-6 sm:p-8 rounded-sm max-w-lg w-full border border-red-300 shadow-2xl relative">
+            <button
+              onClick={() => setSellerRejectModal({ isOpen: false, seller: null, reason: '' })}
+              className="absolute top-4 right-4 text-gray-400 hover:text-charcoal"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-2 text-red-600">
+              <XCircle size={26} />
+              <h3 className="font-heading text-xl text-charcoal">Reject Seller Application</h3>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              Specify reason for rejecting <strong className="text-charcoal">{sellerRejectModal.seller.businessName || sellerRejectModal.seller.name}</strong> ({sellerRejectModal.seller.email}). Rejection email will be sent automatically.
+            </p>
+
+            <form onSubmit={handleConfirmRejectSeller} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold uppercase text-gray-600 mb-1.5 block">
+                  Quick Rejection Reason Suggestions (Click to Select)
+                </label>
+                <div className="flex flex-col gap-1.5 mb-2">
+                  {[
+                    'GST document is missing, expired, or invalid',
+                    'PAN Card details do not match business/owner name',
+                    'BIS Hallmark License proof missing or unverified',
+                    'Incomplete business profile or invalid contact details',
+                    'Document verification or business compliance requirements were not met'
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setSellerRejectModal((prev) => ({ ...prev, reason: preset }))}
+                      className={`text-[0.72rem] px-3 py-1.5 rounded border text-left transition-all flex items-center justify-between ${
+                        sellerRejectModal.reason === preset
+                          ? 'bg-red-600 text-white border-red-600 font-medium shadow-xs'
+                          : 'bg-gray-50 border-gray-200 hover:border-red-400 hover:bg-red-50 text-gray-700'
+                      }`}
+                    >
+                      <span>{preset}</span>
+                      {sellerRejectModal.reason === preset && <CheckCircle2 size={13} className="shrink-0 ml-2" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase text-gray-600 mb-1 block">
+                  Custom Rejection Reason / Details *
+                </label>
+                <textarea
+                  rows="3"
+                  required
+                  placeholder="Enter specific reason why this seller application is rejected..."
+                  value={sellerRejectModal.reason}
+                  onChange={(e) => setSellerRejectModal({ ...sellerRejectModal, reason: e.target.value })}
+                  className="input-field text-xs bg-red-50/30 border-red-200 focus:border-red-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="submit" className="btn-gold bg-red-600 hover:bg-red-700 text-white flex-1 py-3 text-xs font-semibold">
+                  CONFIRM REJECTION & SEND EMAIL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSellerRejectModal({ isOpen: false, seller: null, reason: '' })}
                   className="btn-outline py-3 px-5 text-xs"
                 >
                   CANCEL

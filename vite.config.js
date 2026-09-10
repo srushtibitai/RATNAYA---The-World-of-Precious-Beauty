@@ -9,17 +9,17 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'https://ratnaya-backend.onrender.com',
+        target: 'http://localhost:5050',
         changeOrigin: true,
         secure: false
       },
       '/uploads': {
-        target: 'https://ratnaya-backend.onrender.com',
+        target: 'http://localhost:5050',
         changeOrigin: true,
         secure: false
       },
       '/assets': {
-        target: 'https://ratnaya-backend.onrender.com',
+        target: 'http://localhost:5050',
         changeOrigin: true,
         secure: false
       }

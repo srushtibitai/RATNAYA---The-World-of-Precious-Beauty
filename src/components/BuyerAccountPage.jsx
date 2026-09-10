@@ -23,7 +23,8 @@ import {
   XCircle,
   AlertCircle,
   RefreshCw,
-  DollarSign
+  DollarSign,
+  Clock
 } from 'lucide-react';
 import { api } from '../services/api';
 

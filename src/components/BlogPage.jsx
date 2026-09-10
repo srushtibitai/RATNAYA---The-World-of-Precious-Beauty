@@ -25,9 +25,10 @@ export function BlogPage() {
     async function fetchBlogsFromDB() {
       try {
         setLoading(true);
-        const data = await api.getBlogs(selectedCategory);
-        if (isMounted && data && Array.isArray(data) && data.length > 0) {
-          setPosts(data);
+        const res = await api.getBlogs(selectedCategory);
+        const blogsArray = (res && res.data && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+        if (isMounted && blogsArray.length > 0) {
+          setPosts(blogsArray);
         } else if (isMounted) {
           // Fallback to local filtering if database array is empty
           const filtered = selectedCategory === 'All'
