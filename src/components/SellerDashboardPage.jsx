@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PRODUCTS, SELLERS, MOCK_ORDERS } from '../data/marketplaceData';
-import { api, openDocument, formatDocName } from '../services/api';
+import { api, openDocument, formatDocName, formatDocSize } from '../services/api';
 import ImageModal from './ImageModal';
 import {
   LayoutDashboard,
@@ -87,7 +87,8 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
     logo: seller.logo || '',
     banner: seller.banner || '',
     about: seller.about || '',
-    status: seller.status || 'Pending Verification'
+    status: seller.status || 'Pending Verification',
+    rejectionReason: seller.rejectionReason || ''
   });
   const [isProfileSavedToast, setIsProfileSavedToast] = useState(false);
   const [docVerification, setDocVerification] = useState({ gst: null, pan: null, bis: null });
@@ -153,7 +154,8 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
             logo: sData.logo || currentUser?.logo || '',
             banner: sData.banner || currentUser?.banner || '',
             about: sData.about || currentUser?.about || '',
-            status: sData.status || currentUser?.status || 'Pending Verification'
+            status: sData.status || currentUser?.status || 'Pending Verification',
+            rejectionReason: sData.rejectionReason || currentUser?.rejectionReason || ''
           });
 
           if (sData.status !== 'Approved') {
@@ -291,16 +293,30 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
   const [editingProduct, setEditingProduct] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const handleImageFileUpload = async (file, callback, categoryName = 'general', docType = '') => {
+  const handleImageFileUpload = async (file, callback, categoryName = 'general', docType = '', sizeCallback = null) => {
     if (!file) return;
+
+    // Calculate file size string
+    const fileSizeStr = file.size > 1024 * 1024
+      ? (file.size / (1024 * 1024)).toFixed(2) + ' MB'
+      : (file.size / 1024).toFixed(0) + ' KB';
+
+    // File size safety check to prevent server storage bloat
+    if (file.size > 10 * 1024 * 1024) {
+      alert(`⚠️ Warning: Selected file size is ${fileSizeStr}! Maximum recommended limit is 10MB to save server storage. Please compress the file.`);
+    }
+
     setIsUploading(true);
     try {
       const sellerName = sellerProfile?.name || seller?.name || sellerProfile?.businessName || 'Seller';
       const res = await api.uploadImage(file, categoryName, sellerName, docType);
       if (res && res.success && res.url) {
         callback(res.url);
+        if (sizeCallback) {
+          sizeCallback(fileSizeStr);
+        }
       } else {
-        alert(res?.message || 'File upload failed. Please try again.');
+        alert(res?.message || 'Image upload failed. Please try again.');
       }
     } catch (err) {
       console.error('File upload error:', err);
@@ -485,6 +501,10 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                 <span className="bg-emerald-600 text-white text-xs px-2.5 py-1 rounded font-semibold flex items-center gap-1 shadow-xs">
                   <CheckCircle2 size={12} /> Account Approved
                 </span>
+              ) : sellerProfile.status === 'Rejected' ? (
+                <span className="bg-rose-600 text-white text-xs px-2.5 py-1 rounded font-semibold flex items-center gap-1 shadow-xs">
+                  <XCircle size={12} /> Application Rejected
+                </span>
               ) : (
                 <span className="bg-amber-100 text-amber-900 border border-amber-300 text-xs px-2.5 py-1 rounded font-semibold flex items-center gap-1">
                   <Clock size={12} /> Pending Verification
@@ -496,8 +516,37 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        {/* Application Rejected Notice Banner */}
+        {sellerProfile.status === 'Rejected' && (
+          <div className="bg-rose-50 border-l-4 border-rose-500 p-5 mb-6 rounded text-rose-900 shadow-sm flex flex-col sm:flex-row items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <XCircle size={26} className="text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <strong className="block text-rose-950 font-bold text-base mb-1">
+                  ❌ Seller Account Application Rejected by Admin
+                </strong>
+                <div className="bg-white/90 p-3.5 rounded border border-rose-200 text-xs sm:text-sm text-rose-900 mb-2 shadow-2xs">
+                  <span className="font-semibold text-rose-950 block mb-0.5">Admin Rejection Reason:</span>
+                  <span className="italic font-medium text-rose-800">
+                    "{sellerProfile.rejectionReason || 'Document verification or business compliance criteria were not met.'}"
+                  </span>
+                </div>
+                <p className="text-xs text-rose-800">
+                  Please update your business details, GSTIN/PAN, or compliance document uploads below in <strong>Store Profile</strong> tab and click "SAVE & UPDATE STORE PROFILE" to resubmit your application for Admin review.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveTab('store-profile')}
+              className="btn-gold text-xs py-2.5 px-4 shrink-0 font-semibold uppercase tracking-wider cursor-pointer"
+            >
+              Update Store Profile
+            </button>
+          </div>
+        )}
+
         {/* Pending Verification Notice Banner */}
-        {sellerProfile.status !== 'Approved' && (
+        {sellerProfile.status === 'Pending Verification' && (
           <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded text-amber-900 text-xs sm:text-sm flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-3">
               <AlertCircle size={22} className="text-amber-600 shrink-0" />
@@ -1524,8 +1573,11 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                           {/* GST Certificate Pill */}
                           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-300 bg-white shadow-2xs hover:border-gold transition-all text-xs text-charcoal">
                             <span className="text-sm">📄</span>
-                            <span className="font-mono text-xs max-w-[170px] truncate font-medium">
+                            <span className="font-mono text-xs max-w-[150px] truncate font-medium">
                               {formatDocName(sellerProfile.gstDoc, 'GST_Certificate.pdf')}
+                            </span>
+                            <span className="text-[0.62rem] font-mono font-bold bg-amber-100/90 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300 shrink-0">
+                              {formatDocSize(sellerProfile.gstDocSize, '1.25 MB')}
                             </span>
                             <label className="cursor-pointer text-gold hover:underline text-xs font-semibold ml-1">
                               Upload
@@ -1536,7 +1588,13 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                                 onChange={(e) => {
                                   const file = e.target.files && e.target.files[0];
                                   if (file) {
-                                    handleImageFileUpload(file, (url) => setSellerProfile((prev) => ({ ...prev, gstDoc: url })), 'documents', 'GST_Certificate');
+                                    handleImageFileUpload(
+                                      file,
+                                      (url) => setSellerProfile((prev) => ({ ...prev, gstDoc: url })),
+                                      'documents',
+                                      'GST_Certificate',
+                                      (sz) => setSellerProfile((prev) => ({ ...prev, gstDocSize: sz }))
+                                    );
                                   }
                                 }}
                               />
@@ -1555,8 +1613,11 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                           {/* PAN Card Pill */}
                           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-300 bg-white shadow-2xs hover:border-gold transition-all text-xs text-charcoal">
                             <span className="text-sm">💳</span>
-                            <span className="font-mono text-xs max-w-[170px] truncate font-medium">
+                            <span className="font-mono text-xs max-w-[150px] truncate font-medium">
                               {formatDocName(sellerProfile.panDoc, 'PAN_Card.jpg')}
+                            </span>
+                            <span className="text-[0.62rem] font-mono font-bold bg-amber-100/90 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300 shrink-0">
+                              {formatDocSize(sellerProfile.panDocSize, '480 KB')}
                             </span>
                             <label className="cursor-pointer text-gold hover:underline text-xs font-semibold ml-1">
                               Upload
@@ -1567,7 +1628,13 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                                 onChange={(e) => {
                                   const file = e.target.files && e.target.files[0];
                                   if (file) {
-                                    handleImageFileUpload(file, (url) => setSellerProfile((prev) => ({ ...prev, panDoc: url })), 'documents', 'PAN_Card');
+                                    handleImageFileUpload(
+                                      file,
+                                      (url) => setSellerProfile((prev) => ({ ...prev, panDoc: url })),
+                                      'documents',
+                                      'PAN_Card',
+                                      (sz) => setSellerProfile((prev) => ({ ...prev, panDocSize: sz }))
+                                    );
                                   }
                                 }}
                               />
@@ -1586,8 +1653,11 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                           {/* BIS Hallmark License Pill */}
                           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-300 bg-white shadow-2xs hover:border-gold transition-all text-xs text-charcoal">
                             <span className="text-sm">🏆</span>
-                            <span className="font-mono text-xs max-w-[170px] truncate font-medium">
+                            <span className="font-mono text-xs max-w-[150px] truncate font-medium">
                               {formatDocName(sellerProfile.bisDoc, 'BIS_Hallmark_License.pdf')}
+                            </span>
+                            <span className="text-[0.62rem] font-mono font-bold bg-amber-100/90 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300 shrink-0">
+                              {formatDocSize(sellerProfile.bisDocSize, '850 KB')}
                             </span>
                             <label className="cursor-pointer text-gold hover:underline text-xs font-semibold ml-1">
                               Upload
@@ -1598,7 +1668,13 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                                 onChange={(e) => {
                                   const file = e.target.files && e.target.files[0];
                                   if (file) {
-                                    handleImageFileUpload(file, (url) => setSellerProfile((prev) => ({ ...prev, bisDoc: url })), 'documents', 'BIS_Hallmark_License');
+                                    handleImageFileUpload(
+                                      file,
+                                      (url) => setSellerProfile((prev) => ({ ...prev, bisDoc: url })),
+                                      'documents',
+                                      'BIS_Hallmark_License',
+                                      (sz) => setSellerProfile((prev) => ({ ...prev, bisDocSize: sz }))
+                                    );
                                   }
                                 }}
                               />

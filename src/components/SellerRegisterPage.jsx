@@ -21,8 +21,54 @@ export function SellerRegisterPage({ onLoginSuccess }) {
     category: 'Gold & Kundan Jewellery'
   });
 
+  const [docVerification, setDocVerification] = useState({ gst: null, pan: null, bis: null });
+  const [verifyingDoc, setVerifyingDoc] = useState({ gst: false, pan: false, bis: false });
+
+  const handleVerifyDocument = async (type) => {
+    const docNum = type === 'gst' ? formData.gst : type === 'pan' ? formData.pan : formData.bisLicense;
+    if (!docNum) {
+      setDocVerification((prev) => ({
+        ...prev,
+        [type]: { success: false, message: 'Please enter a number to verify' }
+      }));
+      return;
+    }
+
+    setVerifyingDoc((prev) => ({ ...prev, [type]: true }));
+    try {
+      const res = await api.verifySellerDocument(type, docNum);
+      if (res && res.verified) {
+        setDocVerification((prev) => ({
+          ...prev,
+          [type]: { success: true, message: res.message, details: res.details }
+        }));
+      } else {
+        setDocVerification((prev) => ({
+          ...prev,
+          [type]: { success: false, message: res?.message || 'Invalid format.' }
+        }));
+      }
+    } catch (err) {
+      setDocVerification((prev) => ({
+        ...prev,
+        [type]: { success: false, message: err.message || 'Verification failed.' }
+      }));
+    } finally {
+      setVerifyingDoc((prev) => ({ ...prev, [type]: false }));
+    }
+  };
+
   const handleFileUpload = async (file, fieldKey) => {
     if (!file) return;
+
+    const fileSizeStr = file.size > 1024 * 1024
+      ? (file.size / (1024 * 1024)).toFixed(2) + ' MB'
+      : (file.size / 1024).toFixed(0) + ' KB';
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert(`⚠️ Warning: Selected file size is ${fileSizeStr}! Maximum recommended limit is 10MB to save server storage. Please compress the file.`);
+    }
+
     try {
       const sellerName = formData.businessName || formData.ownerName || 'Seller';
       const docTypeMap = {
@@ -34,7 +80,11 @@ export function SellerRegisterPage({ onLoginSuccess }) {
 
       const res = await api.uploadImage(file, 'documents', sellerName, docType);
       if (res && res.success && res.url) {
-        setFormData((prev) => ({ ...prev, [fieldKey]: res.url }));
+        setFormData((prev) => ({
+          ...prev,
+          [fieldKey]: res.url,
+          [`${fieldKey}Size`]: fileSizeStr
+        }));
       } else {
         alert(res?.message || 'File upload failed. Please try again.');
       }
@@ -207,16 +257,43 @@ export function SellerRegisterPage({ onLoginSuccess }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* GST Number & Document */}
               <div className="sm:col-span-2 p-4 bg-[#FAF6F0] rounded border border-gray-200 space-y-2">
-                <label className="text-xs font-semibold uppercase text-charcoal block">GST Registration Number & Proof Certificate *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 22AAAAA0000A1Z5"
-                  value={formData.gst}
-                  onChange={(e) => setFormData({ ...formData, gst: e.target.value.toUpperCase() })}
-                  className="input-field font-mono uppercase text-sm mb-2"
-                />
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold uppercase text-charcoal block">GST Registration Number & Proof Certificate *</label>
+                  {docVerification.gst?.success && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                      <CheckCircle2 size={11} /> GST Verified
+                    </span>
+                  )}
+                </div>
+                <div className="relative flex items-center mb-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 22AAAAA0000A1Z5"
+                    value={formData.gst}
+                    onChange={(e) => {
+                      setFormData({ ...formData, gst: e.target.value.toUpperCase() });
+                      setDocVerification((prev) => ({ ...prev, gst: null }));
+                    }}
+                    className={`input-field font-mono uppercase text-sm pr-20 ${
+                      docVerification.gst?.success ? 'border-emerald-500 bg-emerald-50/20' : ''
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    disabled={verifyingDoc.gst || !formData.gst}
+                    onClick={() => handleVerifyDocument('gst')}
+                    className="absolute right-1 px-2.5 py-1 text-xs font-semibold rounded bg-gold/15 text-charcoal hover:bg-gold hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    {verifyingDoc.gst ? 'Verifying...' : docVerification.gst?.success ? 'Re-Verify' : 'Verify GST'}
+                  </button>
+                </div>
+                {docVerification.gst && (
+                  <p className={`text-[11px] font-medium ${docVerification.gst.success ? 'text-emerald-700' : 'text-rose-600'}`}>
+                    {docVerification.gst.message}
+                  </p>
+                )}
+                <div className="flex items-center gap-3 pt-1">
                   <label className="btn-outline-gold py-1.5 px-3 text-xs cursor-pointer inline-flex items-center gap-1.5 bg-white">
                     <Upload size={14} /> Upload GST Certificate (PDF/Image)
                     <input
@@ -226,21 +303,53 @@ export function SellerRegisterPage({ onLoginSuccess }) {
                       onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'gstDoc')}
                     />
                   </label>
-                  {formData.gstDoc && <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1"><CheckCircle2 size={13} /> GST Document Attached</span>}
+                  {formData.gstDoc && (
+                    <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
+                      <CheckCircle2 size={13} /> GST Document Attached
+                      {formData.gstDocSize && <span className="font-mono bg-emerald-100 text-emerald-900 text-[0.65rem] px-1.5 py-0.5 rounded border border-emerald-300 ml-1">{formData.gstDocSize}</span>}
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* PAN Number & Document */}
               <div className="p-4 bg-[#FAF6F0] rounded border border-gray-200 space-y-2">
-                <label className="text-xs font-semibold uppercase text-charcoal block">Business / Owner PAN Card Number *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. ABCDE1234F"
-                  value={formData.pan}
-                  onChange={(e) => setFormData({ ...formData, pan: e.target.value.toUpperCase() })}
-                  className="input-field font-mono uppercase text-sm mb-2"
-                />
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold uppercase text-charcoal block">PAN Card Number *</label>
+                  {docVerification.pan?.success && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                      <CheckCircle2 size={11} /> PAN Verified
+                    </span>
+                  )}
+                </div>
+                <div className="relative flex items-center mb-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. ABCDE1234F"
+                    value={formData.pan}
+                    onChange={(e) => {
+                      setFormData({ ...formData, pan: e.target.value.toUpperCase() });
+                      setDocVerification((prev) => ({ ...prev, pan: null }));
+                    }}
+                    className={`input-field font-mono uppercase text-sm pr-20 ${
+                      docVerification.pan?.success ? 'border-emerald-500 bg-emerald-50/20' : ''
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    disabled={verifyingDoc.pan || !formData.pan}
+                    onClick={() => handleVerifyDocument('pan')}
+                    className="absolute right-1 px-2.5 py-1 text-xs font-semibold rounded bg-gold/15 text-charcoal hover:bg-gold hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    {verifyingDoc.pan ? 'Verifying...' : docVerification.pan?.success ? 'Re-Verify' : 'Verify PAN'}
+                  </button>
+                </div>
+                {docVerification.pan && (
+                  <p className={`text-[11px] font-medium ${docVerification.pan.success ? 'text-emerald-700' : 'text-rose-600'}`}>
+                    {docVerification.pan.message}
+                  </p>
+                )}
                 <label className="btn-outline-gold py-1.5 px-3 text-xs cursor-pointer inline-flex items-center gap-1.5 bg-white">
                   <Upload size={14} /> Upload PAN Card Photo/PDF
                   <input
@@ -250,20 +359,52 @@ export function SellerRegisterPage({ onLoginSuccess }) {
                     onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'panDoc')}
                   />
                 </label>
-                {formData.panDoc && <span className="text-xs text-emerald-700 font-semibold block flex items-center gap-1"><CheckCircle2 size={13} /> PAN Document Attached</span>}
+                {formData.panDoc && (
+                  <span className="text-xs text-emerald-700 font-semibold block flex items-center gap-1">
+                    <CheckCircle2 size={13} /> PAN Document Attached
+                    {formData.panDocSize && <span className="font-mono bg-emerald-100 text-emerald-900 text-[0.65rem] px-1.5 py-0.5 rounded border border-emerald-300 ml-1">{formData.panDocSize}</span>}
+                  </span>
+                )}
               </div>
 
               {/* BIS Hallmark License Number & Document */}
               <div className="p-4 bg-[#FAF6F0] rounded border border-gray-200 space-y-2">
-                <label className="text-xs font-semibold uppercase text-charcoal block">BIS Hallmark License Number (HUID) *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. BIS-HUID-991204"
-                  value={formData.bisLicense}
-                  onChange={(e) => setFormData({ ...formData, bisLicense: e.target.value.toUpperCase() })}
-                  className="input-field font-mono uppercase text-sm mb-2"
-                />
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold uppercase text-charcoal block">BIS Hallmark License (HUID) *</label>
+                  {docVerification.bis?.success && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                      <CheckCircle2 size={11} /> BIS Verified
+                    </span>
+                  )}
+                </div>
+                <div className="relative flex items-center mb-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. BIS-HUID-991204"
+                    value={formData.bisLicense}
+                    onChange={(e) => {
+                      setFormData({ ...formData, bisLicense: e.target.value.toUpperCase() });
+                      setDocVerification((prev) => ({ ...prev, bis: null }));
+                    }}
+                    className={`input-field font-mono uppercase text-sm pr-20 ${
+                      docVerification.bis?.success ? 'border-emerald-500 bg-emerald-50/20' : ''
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    disabled={verifyingDoc.bis || !formData.bisLicense}
+                    onClick={() => handleVerifyDocument('bis')}
+                    className="absolute right-1 px-2.5 py-1 text-xs font-semibold rounded bg-gold/15 text-charcoal hover:bg-gold hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    {verifyingDoc.bis ? 'Verifying...' : docVerification.bis?.success ? 'Re-Verify' : 'Verify BIS'}
+                  </button>
+                </div>
+                {docVerification.bis && (
+                  <p className={`text-[11px] font-medium ${docVerification.bis.success ? 'text-emerald-700' : 'text-rose-600'}`}>
+                    {docVerification.bis.message}
+                  </p>
+                )}
                 <label className="btn-outline-gold py-1.5 px-3 text-xs cursor-pointer inline-flex items-center gap-1.5 bg-white">
                   <Upload size={14} /> Upload BIS License Proof
                   <input
@@ -273,7 +414,12 @@ export function SellerRegisterPage({ onLoginSuccess }) {
                     onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'bisDoc')}
                   />
                 </label>
-                {formData.bisDoc && <span className="text-xs text-emerald-700 font-semibold block flex items-center gap-1"><CheckCircle2 size={13} /> BIS License Attached</span>}
+                {formData.bisDoc && (
+                  <span className="text-xs text-emerald-700 font-semibold block flex items-center gap-1">
+                    <CheckCircle2 size={13} /> BIS License Attached
+                    {formData.bisDocSize && <span className="font-mono bg-emerald-100 text-emerald-900 text-[0.65rem] px-1.5 py-0.5 rounded border border-emerald-300 ml-1">{formData.bisDocSize}</span>}
+                  </span>
+                )}
               </div>
             </div>
 

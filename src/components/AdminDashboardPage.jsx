@@ -24,9 +24,23 @@ import {
   X,
   RotateCcw,
   AlertCircle,
-  Trash2
+  Trash2,
+  ChevronDown,
+  Search,
+  Filter,
+  Clock,
+  Truck,
+  MapPin,
+  CreditCard,
+  User,
+  Eye,
+  EyeOff,
+  Calendar,
+  FileText,
+  Download,
+  Table
 } from 'lucide-react';
-import { api, openDocument, formatDocName } from '../services/api';
+import { api, openDocument, formatDocName, formatDocSize } from '../services/api';
 
 export function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -34,25 +48,59 @@ export function AdminDashboardPage() {
   // Admin state management for approvals, sellers, commissions & returns
   const [sellersList, setSellersList] = useState(INITIAL_SELLERS);
   const [adminOrders, setAdminOrders] = useState(MOCK_ORDERS);
-  
+
   const [pendingSellers, setPendingSellers] = useState([]);
 
   const [pendingProducts, setPendingProducts] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('ratnaya_pending_products') || '[]');
-      const combined = [...saved];
-      MOCK_PENDING_PRODUCTS.forEach((item) => {
-        if (!combined.some((p) => p.id === item.id)) {
-          combined.push(item);
+      const uniqueMap = new Map();
+      saved.forEach((item) => {
+        if (item && item.name && (item.approvalStatus === 'Pending Approval' || item.status === 'Pending Approval' || !item.approvalStatus)) {
+          const key = (item.id || item._id || item.name).toString().toLowerCase();
+          if (!uniqueMap.has(key)) {
+            uniqueMap.set(key, item);
+          }
         }
       });
-      return combined;
+      return Array.from(uniqueMap.values());
     } catch (e) {
-      return MOCK_PENDING_PRODUCTS;
+      return [];
     }
   });
 
   const [globalCommission, setGlobalCommission] = useState(10); // 10% default marketplace commission
+  const [globalGstRate, setGlobalGstRate] = useState(3); // 3% default jewellery GST rate
+
+  // Save Commission to Database API
+  const handleSaveCommission = async () => {
+    try {
+      const res = await api.updateCommission(globalCommission);
+      if (res && res.success) {
+        alert(`Global commission updated to ${globalCommission}% in Database!`);
+      } else {
+        alert(`Global commission set to ${globalCommission}%`);
+      }
+    } catch (e) {
+      console.error('Update commission error:', e);
+      alert(`Global commission set to ${globalCommission}%`);
+    }
+  };
+
+  // Save GST Rate to Database API
+  const handleSaveGstRate = async () => {
+    try {
+      const res = await api.updateGstRate(globalGstRate);
+      if (res && res.success) {
+        alert(`Global GST Tax rate updated to ${globalGstRate}% in Database!`);
+      } else {
+        alert(`Global GST Tax rate set to ${globalGstRate}%`);
+      }
+    } catch (e) {
+      console.error('Update GST rate error:', e);
+      alert(`Global GST Tax rate set to ${globalGstRate}%`);
+    }
+  };
 
   // Add Seller Modal state
   const [isAddSellerOpen, setIsAddSellerOpen] = useState(false);
@@ -95,15 +143,34 @@ export function AdminDashboardPage() {
       try {
         const res = await api.getPendingProducts();
         if (res && res.success && Array.isArray(res.data)) {
-          // Merge Database pending products with localStorage
-          const savedProds = JSON.parse(localStorage.getItem('ratnaya_pending_products') || '[]');
-          const combined = [...res.data];
-          savedProds.forEach((item) => {
-            if (!combined.some((p) => p.id === item.id)) {
-              combined.push(item);
-            }
-          });
-          setPendingProducts(combined);
+          if (res.database === 'MongoDB') {
+            // MongoDB is the single source of truth for pending products
+            setPendingProducts(res.data);
+            try {
+              localStorage.setItem('ratnaya_pending_products', JSON.stringify(res.data));
+            } catch (e) { }
+          } else {
+            // Deduplicate local state with backend fallback data by ID and Name
+            const savedProds = JSON.parse(localStorage.getItem('ratnaya_pending_products') || '[]');
+            const uniqueMap = new Map();
+            res.data.forEach((p) => {
+              const key = (p.id || p._id || p.name).toString().toLowerCase();
+              uniqueMap.set(key, p);
+            });
+            savedProds.forEach((item) => {
+              if (item && item.name && (item.approvalStatus === 'Pending Approval' || item.status === 'Pending Approval' || !item.approvalStatus)) {
+                const key = (item.id || item._id || item.name).toString().toLowerCase();
+                if (!uniqueMap.has(key)) {
+                  uniqueMap.set(key, item);
+                }
+              }
+            });
+            const combined = Array.from(uniqueMap.values());
+            setPendingProducts(combined);
+            try {
+              localStorage.setItem('ratnaya_pending_products', JSON.stringify(combined));
+            } catch (e) { }
+          }
         }
       } catch (e) {
         console.warn('Pending products API sync fallback:', e);
@@ -121,10 +188,27 @@ export function AdminDashboardPage() {
       }
     }
 
+    async function syncAdminSettings() {
+      try {
+        const cRes = await api.getCommission();
+        if (cRes && cRes.success && typeof cRes.commission === 'number') {
+          setGlobalCommission(cRes.commission);
+        }
+      } catch (e) { }
+
+      try {
+        const gRes = await api.getGstRate();
+        if (gRes && gRes.success && typeof gRes.gstRate === 'number') {
+          setGlobalGstRate(gRes.gstRate);
+        }
+      } catch (e) { }
+    }
+
     syncBackendPendingSellers();
     syncBackendVerifiedSellers();
     syncBackendPendingProducts();
     syncAdminOrders();
+    syncAdminSettings();
   }, [activeTab]);
 
   // Handle Approve Return & Issue Refund by Admin
@@ -147,15 +231,15 @@ export function AdminDashboardPage() {
           prev.map((o) =>
             o.id === order.id
               ? {
-                  ...o,
-                  status: 'Refunded',
-                  refundDetails: {
-                    refundAmount: order.totalAmount,
-                    refundTxnId: `RFND-${Math.floor(10000000 + Math.random() * 90000000)}`,
-                    refundDate: new Date().toISOString().split('T')[0],
-                    notes: refundNotes
-                  }
+                ...o,
+                status: 'Refunded',
+                refundDetails: {
+                  refundAmount: order.totalAmount,
+                  refundTxnId: `RFND-${Math.floor(10000000 + Math.random() * 90000000)}`,
+                  refundDate: new Date().toISOString().split('T')[0],
+                  notes: refundNotes
                 }
+              }
               : o
           )
         );
@@ -177,6 +261,667 @@ export function AdminDashboardPage() {
     } catch (err) {
       console.error('Delete order error:', err);
     }
+  };
+
+  // Seller-Wise FAQ Accordions State & Handlers
+  const [openSellerAccordions, setOpenSellerAccordions] = useState({});
+  const [expandedOrders, setExpandedOrders] = useState({});
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
+
+  // Date & Month View Filters State
+  const [dateFilterType, setDateFilterType] = useState('ALL'); // 'ALL', 'DAY', 'MONTH', 'TODAY', 'LAST30'
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().split('T')[0].slice(0, 7));
+
+  const toggleOrderDetails = (orderId) => {
+    setExpandedOrders((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId]
+    }));
+  };
+
+  // Handle Order Status Update by Admin
+  const handleUpdateAdminOrderStatus = async (orderId, newStatus) => {
+    try {
+      await api.updateOrderStatus(orderId, newStatus);
+      setAdminOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+      );
+    } catch (err) {
+      console.error('Update order status error:', err);
+      setAdminOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+      );
+    }
+  };
+
+  // Group orders by Seller with Date & Status Filtering
+  const groupedOrdersBySeller = React.useMemo(() => {
+    const map = {};
+
+    // First populate from verified sellers list
+    sellersList.forEach((seller) => {
+      const key = seller.name || seller.businessName || seller.id;
+      if (key) {
+        map[key] = {
+          sellerInfo: seller,
+          sellerName: key,
+          orders: []
+        };
+      }
+    });
+
+    // Populate orders into seller map
+    adminOrders.forEach((ord) => {
+      // 1. Status Filter Check
+      if (orderStatusFilter !== 'ALL' && ord.status !== orderStatusFilter) {
+        return;
+      }
+
+      // 2. Search Query Check
+      if (orderSearchQuery.trim()) {
+        const q = orderSearchQuery.toLowerCase();
+        const matchId = ord.id?.toLowerCase().includes(q);
+        const matchCustomer = (ord.buyerName || ord.customerName || '').toLowerCase().includes(q);
+        const matchSeller = (ord.sellerName || '').toLowerCase().includes(q);
+        const matchProduct = ord.items?.some((i) => i.name?.toLowerCase().includes(q));
+        if (!matchId && !matchCustomer && !matchSeller && !matchProduct) {
+          return;
+        }
+      }
+
+      // 3. Date / Month Filter Check
+      const ordDateStr = ord.date || ord.createdAt;
+      if (ordDateStr && dateFilterType !== 'ALL') {
+        const ordDateObj = new Date(ordDateStr);
+        const isValidDate = !isNaN(ordDateObj.getTime());
+
+        let ordYMD = '';
+        let ordYM = '';
+        if (isValidDate) {
+          ordYMD = ordDateObj.toISOString().split('T')[0];
+          ordYM = ordYMD.slice(0, 7);
+        } else if (typeof ordDateStr === 'string') {
+          ordYMD = ordDateStr.slice(0, 10);
+          ordYM = ordDateStr.slice(0, 7);
+        }
+
+        const todayYMD = new Date().toISOString().split('T')[0];
+
+        if (dateFilterType === 'DAY' && selectedDate) {
+          if (ordYMD !== selectedDate) return;
+        } else if (dateFilterType === 'MONTH' && selectedMonth) {
+          if (ordYM !== selectedMonth) return;
+        } else if (dateFilterType === 'TODAY') {
+          if (ordYMD !== todayYMD) return;
+        } else if (dateFilterType === 'LAST30') {
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          if (isValidDate && ordDateObj < thirtyDaysAgo) return;
+        }
+      }
+
+      const ordSeller =
+        ord.sellerName ||
+        (ord.items && ord.items[0] && ord.items[0].sellerName) ||
+        'Direct / Unassigned Marketplace Orders';
+
+      let matchedKey = Object.keys(map).find(
+        (k) => k.toLowerCase().trim() === ordSeller.toLowerCase().trim()
+      );
+
+      if (!matchedKey) {
+        matchedKey = ordSeller;
+        if (!map[matchedKey]) {
+          map[matchedKey] = {
+            sellerInfo: null,
+            sellerName: matchedKey,
+            orders: []
+          };
+        }
+      }
+
+      map[matchedKey].orders.push(ord);
+    });
+
+    return map;
+  }, [sellersList, adminOrders, orderStatusFilter, orderSearchQuery, dateFilterType, selectedDate, selectedMonth]);
+
+  // Calculate total filtered orders count across all sellers dynamically
+  const totalFilteredOrdersCount = React.useMemo(() => {
+    return Object.values(groupedOrdersBySeller).reduce(
+      (sum, group) => sum + (group.orders ? group.orders.length : 0),
+      0
+    );
+  }, [groupedOrdersBySeller]);
+
+  // Export Filtered Orders to Excel / CSV
+  const handleExportExcel = () => {
+    const allFilteredOrders = [];
+    Object.entries(groupedOrdersBySeller).forEach(([sellerName, group]) => {
+      group.orders.forEach((ord) => {
+        allFilteredOrders.push({
+          sellerName,
+          ...ord
+        });
+      });
+    });
+
+    if (allFilteredOrders.length === 0) {
+      alert('No orders available to export for the selected filter criteria.');
+      return;
+    }
+
+    const headers = [
+      'Order ID',
+      'Order Date',
+      'Seller Name',
+      'Customer Name',
+      'Customer Email',
+      'Customer Phone',
+      'Dispatch Address',
+      'Order Status',
+      'Payment Method',
+      'Tracking Number',
+      'Items Summary',
+      'Total Amount (INR)'
+    ];
+
+    const csvRows = [headers.join(',')];
+
+    allFilteredOrders.forEach((ord) => {
+      const itemsSummary = (ord.items || [])
+        .map((i) => `${i.name} (x${i.qty || 1})`)
+        .join('; ');
+
+      const row = [
+        `"${ord.id || ''}"`,
+        `"${ord.date || ''}"`,
+        `"${(ord.sellerName || '').replace(/"/g, '""')}"`,
+        `"${(ord.buyerName || ord.customerName || '').replace(/"/g, '""')}"`,
+        `"${(ord.buyerEmail || '').replace(/"/g, '""')}"`,
+        `"${(ord.buyerPhone || '').replace(/"/g, '""')}"`,
+        `"${(ord.address || '').replace(/"/g, '""')}"`,
+        `"${ord.status || 'Confirmed'}"`,
+        `"${ord.paymentMethod || 'Prepaid'}"`,
+        `"${ord.trackingNumber || ''}"`,
+        `"${itemsSummary.replace(/"/g, '""')}"`,
+        ord.totalAmount || 0
+      ];
+
+      csvRows.push(row.join(','));
+    });
+
+    const csvContent = '\uFEFF' + csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    let filterLabel = 'All_Orders';
+    if (dateFilterType === 'DAY') filterLabel = `Date_${selectedDate}`;
+    else if (dateFilterType === 'MONTH') filterLabel = `Month_${selectedMonth}`;
+    else if (dateFilterType === 'TODAY') filterLabel = `Today_${new Date().toISOString().split('T')[0]}`;
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Ratnaya_Orders_${filterLabel}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export Filtered Orders to PDF Document
+  const handleExportPDF = () => {
+    const allFilteredOrders = [];
+    Object.entries(groupedOrdersBySeller).forEach(([sellerName, group]) => {
+      group.orders.forEach((ord) => {
+        allFilteredOrders.push({
+          sellerName,
+          ...ord
+        });
+      });
+    });
+
+    if (allFilteredOrders.length === 0) {
+      alert('No orders available to generate PDF report for the selected filters.');
+      return;
+    }
+
+    let filterDesc = 'All Time';
+    if (dateFilterType === 'DAY') filterDesc = `Date: ${selectedDate}`;
+    else if (dateFilterType === 'MONTH') filterDesc = `Month: ${selectedMonth}`;
+    else if (dateFilterType === 'TODAY') filterDesc = `Today: ${new Date().toISOString().split('T')[0]}`;
+    else if (dateFilterType === 'LAST30') filterDesc = 'Last 30 Days';
+
+    const totalRevenue = allFilteredOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+    const logoUrl = `${window.location.origin}/assets/logo.png`;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups in your browser to view and download the PDF report.');
+      return;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Ratnaya Seller Orders Governance Report - ${filterDesc}</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #111; padding: 0; margin: 0; background: #fff; }
+            .report-container { padding: 30px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #c59b27; padding-bottom: 14px; margin-bottom: 20px; }
+            .brand-wrapper { display: flex; align-items: center; gap: 14px; }
+            .brand-logo { height: 46px; width: auto; object-fit: contain; }
+            .brand { font-size: 24px; font-weight: bold; color: #b8860b; letter-spacing: 2px; line-height: 1; }
+            .sub { font-size: 11px; color: #666; text-transform: uppercase; margin-top: 4px; font-weight: 600; }
+            .summary-box { display: flex; gap: 15px; background: #faf6f0; border: 1px solid #e2d8c3; padding: 14px; border-radius: 4px; margin-bottom: 20px; font-size: 12px; }
+            .summary-item { flex: 1; }
+            .summary-item span { font-size: 10px; color: #666; text-transform: uppercase; display: block; font-weight: 600; }
+            .summary-item strong { display: block; font-size: 16px; color: #111; margin-top: 2px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+            th { background: #111; color: #fff; text-align: left; padding: 9px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+            td { padding: 8px 10px; border-bottom: 1px solid #eee; }
+            tr:nth-child(even) { background: #fcfbfa; }
+            .badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: bold; }
+            .badge-delivered { background: #d1fae5; color: #065f46; }
+            .badge-shipped { background: #dbeafe; color: #1e40af; }
+            .badge-confirmed { background: #fef3c7; color: #92400e; }
+            .badge-refunded { background: #f3e8ff; color: #6b21a8; }
+            .footer { margin-top: 30px; font-size: 10px; color: #888; text-align: center; border-top: 1px solid #eee; padding-top: 10px; }
+            .no-print-bar { background: #111; color: #fff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 13px; font-weight: 500; }
+            .btn-download { background: #c59b27; color: #fff; border: none; padding: 8px 18px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+            .btn-download:hover { background: #a67c1e; }
+            .btn-close { background: #333; color: #ccc; border: none; padding: 8px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+            @media print {
+              .no-print { display: none !important; }
+              .report-container { padding: 0; }
+              @page { margin: 1.5cm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print no-print-bar">
+            <span>📄 Ratnaya Order Governance PDF Report Ready</span>
+            <div style="display: flex; gap: 10px;">
+              <button onclick="window.print()" class="btn-download">📥 Download PDF / Save as PDF</button>
+              <button onclick="window.close()" class="btn-close">✕ Close</button>
+            </div>
+          </div>
+
+          <div class="report-container">
+            <div class="header">
+              <div class="brand-wrapper">
+                <img src="${logoUrl}" alt="Ratnaya Logo" class="brand-logo" />
+                <div>
+                  <div class="brand">RATNAYA</div>
+                  <div class="sub">Luxury Jewellery Marketplace • Seller Governance Report</div>
+                </div>
+              </div>
+              <div style="text-align: right; font-size: 11px;">
+                <div><strong>Report Date:</strong> ${new Date().toLocaleDateString('en-IN')}</div>
+                <div><strong>Time Filter:</strong> ${filterDesc}</div>
+                <div><strong>Status Filter:</strong> ${orderStatusFilter}</div>
+              </div>
+            </div>
+
+            <div class="summary-box">
+              <div class="summary-item">
+                <span>Total Orders</span>
+                <strong>${allFilteredOrders.length} Orders</strong>
+              </div>
+              <div class="summary-item">
+                <span>Total Revenue</span>
+                <strong>₹${totalRevenue.toLocaleString('en-IN')}</strong>
+              </div>
+              <div class="summary-item">
+                <span>Active Sellers</span>
+                <strong>${Object.keys(groupedOrdersBySeller).length} Jewellers</strong>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Date</th>
+                  <th>Seller / Jeweller</th>
+                  <th>Customer</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Payment & Tracking</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${allFilteredOrders
+        .map(
+          (o) => `
+                  <tr>
+                    <td><strong>${o.id}</strong></td>
+                    <td>${o.date || 'N/A'}</td>
+                    <td>${o.sellerName}</td>
+                    <td>${o.buyerName || o.customerName || 'Customer'}</td>
+                    <td><strong>₹${(o.totalAmount || 0).toLocaleString('en-IN')}</strong></td>
+                    <td>
+                      <span class="badge ${o.status === 'Delivered'
+              ? 'badge-delivered'
+              : o.status === 'Shipped'
+                ? 'badge-shipped'
+                : o.status === 'Refunded'
+                  ? 'badge-refunded'
+                  : 'badge-confirmed'
+            }">
+                        ${o.status || 'Confirmed'}
+                      </span>
+                    </td>
+                    <td>${o.paymentMethod || 'Prepaid'} | ${o.trackingNumber || 'Awaiting Dispatch'}</td>
+                  </tr>
+                `
+        )
+        .join('')}
+              </tbody>
+            </table>
+
+            <div class="footer">
+              Ratnaya Super Admin Official Audit Report • Confidential Internal Document
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 400);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  // Export Individual Seller Orders to Excel / CSV
+  const handleExportSellerExcel = (sellerKey, group) => {
+    const sellerOrders = group.orders || [];
+
+    if (sellerOrders.length === 0) {
+      alert(`No orders available to export for jeweller "${sellerKey}".`);
+      return;
+    }
+
+    const headers = [
+      'Order ID',
+      'Order Date',
+      'Jeweller / Seller',
+      'Customer Name',
+      'Customer Email',
+      'Customer Phone',
+      'Dispatch Address',
+      'Order Status',
+      'Payment Method',
+      'Tracking Number',
+      'Items Summary',
+      'Total Amount (INR)'
+    ];
+
+    const csvRows = [headers.join(',')];
+
+    sellerOrders.forEach((ord) => {
+      const itemsSummary = (ord.items || [])
+        .map((i) => `${i.name} (x${i.qty || 1})`)
+        .join('; ');
+
+      const row = [
+        `"${ord.id || ''}"`,
+        `"${ord.date || ''}"`,
+        `"${sellerKey.replace(/"/g, '""')}"`,
+        `"${(ord.buyerName || ord.customerName || '').replace(/"/g, '""')}"`,
+        `"${(ord.buyerEmail || '').replace(/"/g, '""')}"`,
+        `"${(ord.buyerPhone || '').replace(/"/g, '""')}"`,
+        `"${(ord.address || '').replace(/"/g, '""')}"`,
+        `"${ord.status || 'Confirmed'}"`,
+        `"${ord.paymentMethod || 'Prepaid'}"`,
+        `"${ord.trackingNumber || ''}"`,
+        `"${itemsSummary.replace(/"/g, '""')}"`,
+        ord.totalAmount || 0
+      ];
+
+      csvRows.push(row.join(','));
+    });
+
+    const csvContent = '\uFEFF' + csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    const cleanSellerName = sellerKey.replace(/[^a-zA-Z0-9_]/g, '_');
+    let filterLabel = 'All_Time';
+    if (dateFilterType === 'DAY') filterLabel = `Date_${selectedDate}`;
+    else if (dateFilterType === 'MONTH') filterLabel = `Month_${selectedMonth}`;
+    else if (dateFilterType === 'TODAY') filterLabel = `Today_${new Date().toISOString().split('T')[0]}`;
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Ratnaya_Orders_${cleanSellerName}_${filterLabel}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export Individual Seller Orders to PDF Document
+  const handleExportSellerPDF = (sellerKey, group) => {
+    const sellerOrders = group.orders || [];
+
+    if (sellerOrders.length === 0) {
+      alert(`No orders available to generate PDF report for jeweller "${sellerKey}".`);
+      return;
+    }
+
+    let filterDesc = 'All Time';
+    if (dateFilterType === 'DAY') filterDesc = `Date: ${selectedDate}`;
+    else if (dateFilterType === 'MONTH') filterDesc = `Month: ${selectedMonth}`;
+    else if (dateFilterType === 'TODAY') filterDesc = `Today: ${new Date().toISOString().split('T')[0]}`;
+    else if (dateFilterType === 'LAST30') filterDesc = 'Last 30 Days';
+
+    const sellerTotalRevenue = sellerOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+    const sellerInfo = group.sellerInfo;
+    const logoUrl = `${window.location.origin}/assets/logo.png`;
+    const sellerLogoUrl = sellerInfo?.logo
+      ? (sellerInfo.logo.startsWith('http') ? sellerInfo.logo : window.location.origin + (sellerInfo.logo.startsWith('/') ? sellerInfo.logo : '/' + sellerInfo.logo))
+      : null;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups in your browser to view and download the PDF report.');
+      return;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Ratnaya Merchant Statement - ${sellerKey} (${filterDesc})</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #111; padding: 0; margin: 0; background: #fff; }
+            .report-container { padding: 30px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #c59b27; padding-bottom: 14px; margin-bottom: 20px; }
+            .brand-wrapper { display: flex; align-items: center; gap: 14px; }
+            .brand-logo { height: 46px; width: auto; object-fit: contain; }
+            .brand { font-size: 24px; font-weight: bold; color: #b8860b; letter-spacing: 2px; line-height: 1; }
+            .sub { font-size: 11px; color: #666; text-transform: uppercase; margin-top: 4px; font-weight: 600; }
+            .seller-card { background: #faf6f0; border: 1px solid #e2d8c3; padding: 16px; border-radius: 4px; margin-bottom: 20px; font-size: 12px; }
+            .seller-header { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+            .seller-logo { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #c59b27; }
+            .seller-card h2 { margin: 0; font-size: 18px; color: #111; }
+            .seller-details { color: #555; font-size: 11px; margin-top: 3px; }
+            .summary-box { display: flex; gap: 15px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #d8caa9; }
+            .summary-item { flex: 1; }
+            .summary-item span { font-size: 10px; color: #666; text-transform: uppercase; display: block; font-weight: 600; }
+            .summary-item strong { display: block; font-size: 15px; color: #111; margin-top: 2px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+            th { background: #111; color: #fff; text-align: left; padding: 9px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+            td { padding: 8px 10px; border-bottom: 1px solid #eee; }
+            tr:nth-child(even) { background: #fcfbfa; }
+            .badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: bold; }
+            .badge-delivered { background: #d1fae5; color: #065f46; }
+            .badge-shipped { background: #dbeafe; color: #1e40af; }
+            .badge-confirmed { background: #fef3c7; color: #92400e; }
+            .badge-refunded { background: #f3e8ff; color: #6b21a8; }
+            .footer { margin-top: 30px; font-size: 10px; color: #888; text-align: center; border-top: 1px solid #eee; padding-top: 10px; }
+            .no-print-bar { background: #111; color: #fff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 13px; font-weight: 500; }
+            .btn-download { background: #c59b27; color: #fff; border: none; padding: 8px 18px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+            .btn-download:hover { background: #a67c1e; }
+            .btn-close { background: #333; color: #ccc; border: none; padding: 8px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+            @media print {
+              .no-print { display: none !important; }
+              .report-container { padding: 0; }
+              @page { margin: 1.5cm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print no-print-bar">
+            <span>📄 Ratnaya Merchant Statement PDF for <strong>${sellerKey}</strong></span>
+            <div style="display: flex; gap: 10px;">
+              <button onclick="window.print()" class="btn-download">📥 Download PDF / Save as PDF</button>
+              <button onclick="window.close()" class="btn-close">✕ Close</button>
+            </div>
+          </div>
+
+          <div class="report-container">
+            <div class="header">
+              <div class="brand-wrapper">
+                <img src="${logoUrl}" alt="Ratnaya Logo" class="brand-logo" />
+                <div>
+                  <div class="brand">RATNAYA</div>
+                  <div class="sub">Luxury Jewellery Marketplace • Individual Merchant Order Statement</div>
+                </div>
+              </div>
+              <div style="text-align: right; font-size: 11px;">
+                <div><strong>Statement Date:</strong> ${new Date().toLocaleDateString('en-IN')}</div>
+                <div><strong>Time Range:</strong> ${filterDesc}</div>
+                <div><strong>Status Filter:</strong> ${orderStatusFilter}</div>
+              </div>
+            </div>
+
+            <div class="seller-card">
+              <div class="seller-header">
+                ${sellerLogoUrl ? `<img src="${sellerLogoUrl}" alt="${sellerKey}" class="seller-logo" />` : ''}
+                <div>
+                  <h2>${sellerKey}</h2>
+                  <div class="seller-details">
+                    ${sellerInfo?.owner ? `Owner: <strong>${sellerInfo.owner}</strong>` : 'Verified Jeweller Merchant'}
+                    ${sellerInfo?.city ? ` | Location: <strong>${sellerInfo.city}</strong>` : ''}
+                    ${sellerInfo?.gst ? ` | GSTIN: <strong>${sellerInfo.gst}</strong>` : ''}
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-box">
+                <div class="summary-item">
+                  <span>Total Seller Orders</span>
+                  <strong>${sellerOrders.length} Orders</strong>
+                </div>
+                <div class="summary-item">
+                  <span>Total Gross Sales</span>
+                  <strong>₹${sellerTotalRevenue.toLocaleString('en-IN')}</strong>
+                </div>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Date</th>
+                  <th>Customer Name</th>
+                  <th>Contact Details</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Payment & Logistics</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${sellerOrders
+        .map(
+          (o) => `
+                  <tr>
+                    <td><strong>${o.id}</strong></td>
+                    <td>${o.date || 'N/A'}</td>
+                    <td>${o.buyerName || o.customerName || 'Customer'}</td>
+                    <td>${o.buyerEmail || ''} ${o.buyerPhone ? `<br/>${o.buyerPhone}` : ''}</td>
+                    <td><strong>₹${(o.totalAmount || 0).toLocaleString('en-IN')}</strong></td>
+                    <td>
+                      <span class="badge ${o.status === 'Delivered'
+              ? 'badge-delivered'
+              : o.status === 'Shipped'
+                ? 'badge-shipped'
+                : o.status === 'Refunded'
+                  ? 'badge-refunded'
+                  : 'badge-confirmed'
+            }">
+                        ${o.status || 'Confirmed'}
+                      </span>
+                    </td>
+                    <td>${o.paymentMethod || 'Prepaid'}<br/><small style="color:#666">${o.trackingNumber || 'No tracking'}</small></td>
+                  </tr>
+                `
+        )
+        .join('')}
+              </tbody>
+            </table>
+
+            <div class="footer">
+              Ratnaya Super Admin Official Audit Statement for ${sellerKey} • Confidential Document
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 400);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  // Auto-expand sellers that have active orders when Orders tab is active
+  useEffect(() => {
+    if (activeTab === 'orders') {
+      const initialOpen = {};
+      Object.entries(groupedOrdersBySeller).forEach(([key, group]) => {
+        if (group.orders.length > 0) {
+          initialOpen[key] = true;
+        }
+      });
+      setOpenSellerAccordions((prev) => ({ ...initialOpen, ...prev }));
+    }
+  }, [activeTab, groupedOrdersBySeller]);
+
+  const toggleSellerAccordion = (sellerKey) => {
+    setOpenSellerAccordions((prev) => ({
+      ...prev,
+      [sellerKey]: !prev[sellerKey]
+    }));
+  };
+
+  const handleExpandAllSellers = () => {
+    const allOpen = {};
+    Object.keys(groupedOrdersBySeller).forEach((key) => {
+      allOpen[key] = true;
+    });
+    setOpenSellerAccordions(allOpen);
+  };
+
+  const handleCollapseAllSellers = () => {
+    setOpenSellerAccordions({});
   };
 
   // Load Sellers and Pending Applications from Backend API on mount
@@ -278,6 +1023,42 @@ export function AdminDashboardPage() {
     }
   };
 
+  // Seller Document Verification State (GST, PAN, BIS)
+  const [docVerification, setDocVerification] = useState({});
+  const [verifyingDoc, setVerifyingDoc] = useState({});
+
+  const handleVerifySellerDoc = async (sellerId, type, number) => {
+    if (!number) {
+      alert(`No ${type.toUpperCase()} number provided for verification.`);
+      return;
+    }
+
+    const key = `${sellerId}_${type}`;
+    setVerifyingDoc((prev) => ({ ...prev, [key]: true }));
+
+    try {
+      const res = await api.verifySellerDocument(type, number);
+      if (res && res.verified) {
+        setDocVerification((prev) => ({
+          ...prev,
+          [key]: { success: true, message: res.message, details: res.details }
+        }));
+      } else {
+        setDocVerification((prev) => ({
+          ...prev,
+          [key]: { success: false, message: res?.message || 'Invalid format.' }
+        }));
+      }
+    } catch (err) {
+      setDocVerification((prev) => ({
+        ...prev,
+        [key]: { success: false, message: err.message || 'Verification failed.' }
+      }));
+    } finally {
+      setVerifyingDoc((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
 
   // Product Rejection Modal State
   const [rejectModal, setRejectModal] = useState({
@@ -286,12 +1067,20 @@ export function AdminDashboardPage() {
     reason: 'Does not meet product quality & BIS hallmarking standards.'
   });
 
-  const handleApproveProduct = async (id) => {
-    const filtered = pendingProducts.filter((p) => p.id !== id && p._id !== id);
+  const handleApproveProduct = async (id, name) => {
+    const targetIdStr = String(id).toLowerCase();
+    const targetNameStr = name ? String(name).toLowerCase() : '';
+    const filtered = pendingProducts.filter((p) => {
+      const pId = String(p.id || p._id || '').toLowerCase();
+      const pName = String(p.name || '').toLowerCase();
+      if (pId === targetIdStr) return false;
+      if (targetNameStr && pName === targetNameStr) return false;
+      return true;
+    });
     setPendingProducts(filtered);
     try {
       localStorage.setItem('ratnaya_pending_products', JSON.stringify(filtered));
-    } catch (e) {}
+    } catch (e) { }
 
     // Database API approve call
     await api.approveProduct(id).catch((err) => console.error('API Approve Error:', err));
@@ -310,13 +1099,22 @@ export function AdminDashboardPage() {
     if (!rejectModal.product) return;
 
     const prodId = rejectModal.product.id || rejectModal.product._id;
+    const prodName = rejectModal.product.name;
     const reason = rejectModal.reason || 'Product rejected by Admin.';
 
-    const filtered = pendingProducts.filter((p) => p.id !== prodId && p._id !== prodId);
+    const targetIdStr = String(prodId).toLowerCase();
+    const targetNameStr = prodName ? String(prodName).toLowerCase() : '';
+    const filtered = pendingProducts.filter((p) => {
+      const pId = String(p.id || p._id || '').toLowerCase();
+      const pName = String(p.name || '').toLowerCase();
+      if (pId === targetIdStr) return false;
+      if (targetNameStr && pName === targetNameStr) return false;
+      return true;
+    });
     setPendingProducts(filtered);
     try {
       localStorage.setItem('ratnaya_pending_products', JSON.stringify(filtered));
-    } catch (err) {}
+    } catch (e) { }
 
     try {
       const res = await api.rejectProduct(prodId, reason);
@@ -414,11 +1212,16 @@ export function AdminDashboardPage() {
             <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={() => setIsAddSellerOpen(true)}
-                className="btn-gold py-2 px-4 text-xs flex items-center gap-1.5"
+                className="btn-gold py-2.5 px-4 text-xs font-bold flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer"
               >
                 <PlusCircle size={15} /> ADD NEW SELLER
               </button>
-              <span className="badge-gold text-xs">Default Commission: {globalCommission}%</span>
+              <span className="bg-gold/20 text-gold-light border border-gold/40 text-xs px-3.5 py-2 rounded-full font-bold tracking-wider shrink-0 uppercase">
+                COMMISSION: {globalCommission}%
+              </span>
+              <span className="bg-gold/20 text-gold-light border border-gold/40 text-xs px-3.5 py-2 rounded-full font-bold tracking-wider shrink-0 uppercase">
+                GST RATE: {globalGstRate}%
+              </span>
             </div>
           </div>
         </div>
@@ -441,11 +1244,10 @@ export function AdminDashboardPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`w-full text-left p-3.5 text-xs sm:text-sm flex items-center gap-3 whitespace-nowrap border-b border-gray-100 transition-colors cursor-pointer ${
-                    activeTab === tab.id
+                  className={`w-full text-left p-3.5 text-xs sm:text-sm flex items-center gap-3 whitespace-nowrap border-b border-gray-100 transition-colors cursor-pointer ${activeTab === tab.id
                       ? 'bg-[#FAF6F0] text-gold-dark font-semibold border-l-4 border-l-gold'
                       : 'text-charcoal hover:bg-gray-50 bg-transparent'
-                  }`}
+                    }`}
                 >
                   {tab.icon} {tab.label}
                 </button>
@@ -573,28 +1375,70 @@ export function AdminDashboardPage() {
 
             {/* COMMISSION & PAYOUTS TAB */}
             {activeTab === 'commission' && (
-              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm">
-                <h3 className="font-heading text-2xl mb-2">
-                  Admin Commission Configuration & Jeweller Payouts
-                </h3>
-                <p className="text-xs sm:text-sm text-gray-500 mb-6">
-                  Set global commission rates or configure custom percentage rates per jeweller merchant.
-                </p>
+              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm space-y-6">
+                <div>
+                  <h3 className="font-heading text-2xl text-charcoal mb-1">
+                    Admin Commission Configuration & GST Tax Rates
+                  </h3>
+                  <p className="text-xs sm:text-sm text-gray-500">
+                    Set global platform commission percentages, default GST tax rates, or configure custom percentage rates per jeweller merchant.
+                  </p>
+                </div>
 
-                <div className="bg-[#FAF6F0] p-6 rounded-sm mb-6 max-w-md border border-gray-200">
-                  <label className="text-xs font-semibold uppercase text-gray-500 block mb-2">
-                    Default Global Platform Commission Rate (%)
-                  </label>
-                  <div className="flex gap-3">
-                    <input
-                      type="number"
-                      value={globalCommission}
-                      onChange={(e) => setGlobalCommission(Number(e.target.value))}
-                      className="input-field"
-                    />
-                    <button className="btn-gold py-2.5 px-4 text-xs whitespace-nowrap" onClick={() => alert(`Global commission set to ${globalCommission}%`)}>
-                      SAVE GLOBAL RATE
-                    </button>
+                {/* 2-Column Side-by-Side Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Card 1: Default Global Commission Rate */}
+                  <div className="bg-[#FAF6F0] p-6 rounded-sm border border-gray-200 shadow-2xs space-y-3">
+                    <label className="text-xs font-semibold uppercase text-gray-600 block">
+                      Default Global Platform Commission Rate (%)
+                    </label>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <div className="relative max-w-[130px] shrink-0">
+                        <input
+                          type="number"
+                          min="0"
+                          max="50"
+                          value={globalCommission}
+                          onChange={(e) => setGlobalCommission(Number(e.target.value))}
+                          className="input-field text-center font-bold text-base text-charcoal py-2 pr-7"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">%</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-gold py-2.5 px-5 text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer shadow-2xs"
+                        onClick={handleSaveCommission}
+                      >
+                        SAVE GLOBAL RATE
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Default Global GST Tax Rate */}
+                  <div className="bg-[#FAF6F0] p-6 rounded-sm border border-gray-200 shadow-2xs space-y-3">
+                    <label className="text-xs font-semibold uppercase text-gray-600 block">
+                      Default Global GST Tax Rate (%)
+                    </label>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <div className="relative max-w-[130px] shrink-0">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={globalGstRate}
+                          onChange={(e) => setGlobalGstRate(Number(e.target.value))}
+                          className="input-field text-center font-bold text-base text-charcoal py-2 pr-7"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">%</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-gold py-2.5 px-5 text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer shadow-2xs"
+                        onClick={handleSaveGstRate}
+                      >
+                        SAVE GST RATE
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -631,15 +1475,112 @@ export function AdminDashboardPage() {
                             <span className="badge-pending text-xs">{s.kycStatus}</span>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs text-gray-600">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-xs text-gray-600">
                             <div><strong>Owner Name:</strong> {s.ownerName || s.owner}</div>
                             <div><strong>City / Base:</strong> {s.city || 'Jaipur'}</div>
                             <div><strong>Email:</strong> {s.email}</div>
                             <div><strong>Phone:</strong> {s.phone}</div>
-                            <div><strong>GSTIN Number:</strong> <span className="font-mono text-charcoal font-semibold">{s.gst || 'Not provided'}</span></div>
-                            <div><strong>PAN Card Number:</strong> <span className="font-mono text-charcoal font-semibold">{s.pan || 'Not provided'}</span></div>
-                            <div><strong>BIS Hallmark License:</strong> <span className="font-mono text-charcoal font-semibold">{s.bisLicense || 'BIS-HUID-992014'}</span></div>
                             <div><strong>Applied Date:</strong> {s.appliedDate || 'Recent'}</div>
+
+                            {/* GSTIN Verification Row */}
+                            <div className="sm:col-span-2 bg-white p-2.5 rounded border border-gray-200 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-charcoal">GSTIN Number:</span>
+                                <span className="font-mono text-charcoal font-bold">{s.gst || 'Not provided'}</span>
+                                {docVerification[`${s.id}_gst`]?.success ? (
+                                  <span className="bg-emerald-100 text-emerald-800 text-[0.68rem] px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                                    <CheckCircle2 size={11} /> Verified Active Taxpayer
+                                  </span>
+                                ) : docVerification[`${s.id}_gst`]?.success === false ? (
+                                  <span className="bg-rose-100 text-rose-800 text-[0.68rem] px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                                    <XCircle size={11} /> Invalid GST
+                                  </span>
+                                ) : null}
+                              </div>
+                              <button
+                                type="button"
+                                disabled={verifyingDoc[`${s.id}_gst`] || !s.gst}
+                                onClick={() => handleVerifySellerDoc(s.id, 'gst', s.gst)}
+                                className="btn-gold py-1 px-3 text-[0.7rem] disabled:opacity-50 cursor-pointer font-semibold"
+                              >
+                                {verifyingDoc[`${s.id}_gst`] ? 'Verifying...' : docVerification[`${s.id}_gst`]?.success ? '✓ Re-Verify GST' : 'Verify GST'}
+                              </button>
+                              {docVerification[`${s.id}_gst`]?.success && (
+                                <div className="w-full text-[0.7rem] text-emerald-800 font-medium bg-emerald-50 p-2 rounded border border-emerald-200 mt-1">
+                                  ✓ Govt Portal Status: Active Taxpayer | State Code: {docVerification[`${s.id}_gst`].details?.stateCode} | PAN Segment: {docVerification[`${s.id}_gst`].details?.panPart} | Type: {docVerification[`${s.id}_gst`].details?.taxpayerType}
+                                </div>
+                              )}
+                              {docVerification[`${s.id}_gst`]?.success === false && (
+                                <div className="w-full text-[0.7rem] text-rose-700 font-medium bg-rose-50 p-1.5 rounded border border-rose-200 mt-1">
+                                  ⚠️ {docVerification[`${s.id}_gst`].message}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* PAN Card Verification Row */}
+                            <div className="sm:col-span-2 bg-white p-2.5 rounded border border-gray-200 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-charcoal">PAN Card Number:</span>
+                                <span className="font-mono text-charcoal font-bold">{s.pan || 'Not provided'}</span>
+                                {docVerification[`${s.id}_pan`]?.success ? (
+                                  <span className="bg-emerald-100 text-emerald-800 text-[0.68rem] px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                                    <CheckCircle2 size={11} /> Verified Entity PAN
+                                  </span>
+                                ) : docVerification[`${s.id}_pan`]?.success === false ? (
+                                  <span className="bg-rose-100 text-rose-800 text-[0.68rem] px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                                    <XCircle size={11} /> Invalid PAN
+                                  </span>
+                                ) : null}
+                              </div>
+                              <button
+                                type="button"
+                                disabled={verifyingDoc[`${s.id}_pan`] || !s.pan}
+                                onClick={() => handleVerifySellerDoc(s.id, 'pan', s.pan)}
+                                className="btn-gold py-1 px-3 text-[0.7rem] disabled:opacity-50 cursor-pointer font-semibold"
+                              >
+                                {verifyingDoc[`${s.id}_pan`] ? 'Verifying...' : docVerification[`${s.id}_pan`]?.success ? '✓ Re-Verify PAN' : 'Verify PAN'}
+                              </button>
+                              {docVerification[`${s.id}_pan`]?.success && (
+                                <div className="w-full text-[0.7rem] text-emerald-800 font-medium bg-emerald-50 p-2 rounded border border-emerald-200 mt-1">
+                                  ✓ NSDL Verification: Active & Verified | Type: {docVerification[`${s.id}_pan`].details?.panType}
+                                </div>
+                              )}
+                              {docVerification[`${s.id}_pan`]?.success === false && (
+                                <div className="w-full text-[0.7rem] text-rose-700 font-medium bg-rose-50 p-1.5 rounded border border-rose-200 mt-1">
+                                  ⚠️ {docVerification[`${s.id}_pan`].message}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* BIS Hallmark Verification Row */}
+                            <div className="sm:col-span-2 bg-white p-2.5 rounded border border-gray-200 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-charcoal">BIS Hallmark License:</span>
+                                <span className="font-mono text-charcoal font-bold">{s.bisLicense || 'BIS-HUID-992014'}</span>
+                                {docVerification[`${s.id}_bis`]?.success ? (
+                                  <span className="bg-emerald-100 text-emerald-800 text-[0.68rem] px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                                    <CheckCircle2 size={11} /> Verified Hallmark License
+                                  </span>
+                                ) : docVerification[`${s.id}_bis`]?.success === false ? (
+                                  <span className="bg-rose-100 text-rose-800 text-[0.68rem] px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                                    <XCircle size={11} /> Invalid License
+                                  </span>
+                                ) : null}
+                              </div>
+                              <button
+                                type="button"
+                                disabled={verifyingDoc[`${s.id}_bis`]}
+                                onClick={() => handleVerifySellerDoc(s.id, 'bis', s.bisLicense || 'BIS-HUID-992014')}
+                                className="btn-gold py-1 px-3 text-[0.7rem] disabled:opacity-50 cursor-pointer font-semibold"
+                              >
+                                {verifyingDoc[`${s.id}_bis`] ? 'Verifying...' : docVerification[`${s.id}_bis`]?.success ? '✓ Re-Verify BIS' : 'Verify BIS'}
+                              </button>
+                              {docVerification[`${s.id}_bis`]?.success && (
+                                <div className="w-full text-[0.7rem] text-emerald-800 font-medium bg-emerald-50 p-2 rounded border border-emerald-200 mt-1">
+                                  ✓ BIS Portal Verified: {docVerification[`${s.id}_bis`].details?.licenseType} | Grade: {docVerification[`${s.id}_bis`].details?.hallmarkPurityGrade}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           {/* Submitted KYC Proof Documents */}
@@ -651,10 +1592,13 @@ export function AdminDashboardPage() {
                                 type="button"
                                 onClick={() => openDocument(s.gstDoc || '/uploads/GST_Certificate.pdf')}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-gray-300 bg-white hover:border-gold hover:bg-[#FAF6F0] transition-all text-xs font-mono text-charcoal shadow-2xs font-medium cursor-pointer"
-                                title="Click to View / Download GST Certificate"
+                                title={`Click to View / Download GST Certificate (${formatDocSize(s.gstDocSize, '1.25 MB')})`}
                               >
                                 <span>📄</span>
                                 <span>{formatDocName(s.gstDoc, 'GST_Certificate.pdf')}</span>
+                                <span className="text-[0.62rem] font-mono font-bold bg-amber-100/90 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300 ml-1">
+                                  {formatDocSize(s.gstDocSize, '1.25 MB')}
+                                </span>
                               </button>
 
                               {/* PAN Card Pill */}
@@ -662,10 +1606,13 @@ export function AdminDashboardPage() {
                                 type="button"
                                 onClick={() => openDocument(s.panDoc || '/uploads/PAN_Card.jpg')}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-gray-300 bg-white hover:border-gold hover:bg-[#FAF6F0] transition-all text-xs font-mono text-charcoal shadow-2xs font-medium cursor-pointer"
-                                title="Click to View / Download PAN Card Proof"
+                                title={`Click to View / Download PAN Card Proof (${formatDocSize(s.panDocSize, '480 KB')})`}
                               >
                                 <span>💳</span>
                                 <span>{formatDocName(s.panDoc, 'PAN_Card.jpg')}</span>
+                                <span className="text-[0.62rem] font-mono font-bold bg-amber-100/90 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300 ml-1">
+                                  {formatDocSize(s.panDocSize, '480 KB')}
+                                </span>
                               </button>
 
                               {/* BIS Hallmark License Pill */}
@@ -673,10 +1620,13 @@ export function AdminDashboardPage() {
                                 type="button"
                                 onClick={() => openDocument(s.bisDoc || '/uploads/BIS_Hallmark_License.pdf')}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-gray-300 bg-white hover:border-gold hover:bg-[#FAF6F0] transition-all text-xs font-mono text-charcoal shadow-2xs font-medium cursor-pointer"
-                                title="Click to View / Download BIS Hallmark License Certificate"
+                                title={`Click to View / Download BIS Hallmark License Certificate (${formatDocSize(s.bisDocSize, '850 KB')})`}
                               >
                                 <span>🏆</span>
                                 <span>{formatDocName(s.bisDoc, 'BIS_Hallmark_License.pdf')}</span>
+                                <span className="text-[0.62rem] font-mono font-bold bg-amber-100/90 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300 ml-1">
+                                  {formatDocSize(s.bisDocSize, '850 KB')}
+                                </span>
                               </button>
                             </div>
                           </div>
@@ -783,7 +1733,7 @@ export function AdminDashboardPage() {
                           {/* Actions */}
                           <div className="flex sm:flex-col items-center gap-2.5 shrink-0 w-full sm:w-auto">
                             <button
-                              onClick={() => handleApproveProduct(prodId)}
+                              onClick={() => handleApproveProduct(prodId, p.name)}
                               className="btn-gold py-2.5 px-5 text-xs whitespace-nowrap w-full flex items-center justify-center gap-1.5"
                             >
                               <CheckCircle2 size={16} /> Approve & Publish
@@ -885,56 +1835,486 @@ export function AdminDashboardPage() {
               </div>
             )}
 
-            {/* ORDERS & LOGISTICS TAB */}
+            {/* ORDERS & LOGISTICS TAB - SELLER-WISE FAQ ACCORDION DESIGN */}
             {activeTab === 'orders' && (
-              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-heading text-2xl text-charcoal">
-                    Marketplace Orders & Logistics Monitoring
-                  </h3>
-                  <span className="badge-gold text-xs">{adminOrders.length} Total Orders</span>
+              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm space-y-6">
+                {/* Header Bar */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-5">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 bg-gold/15 text-gold-dark px-3 py-1 rounded-full text-[0.68rem] font-bold uppercase tracking-wider mb-1">
+                      <Store size={14} /> SELLER-WISE ORDER GOVERNANCE
+                    </div>
+                    <h3 className="font-heading text-2xl text-charcoal">
+                      Jeweller Orders & Logistics Monitoring
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      View and manage buyer orders organized seller-by-seller with FAQ-style expandable accordions.
+                    </p>
+                  </div>
+
+                  {/* Overview Stats Badges */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="badge-gold text-xs px-3 py-1.5 font-semibold">
+                      {totalFilteredOrdersCount} Total Orders
+                    </span>
+                    <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs px-3 py-1.5 rounded font-semibold">
+                      {Object.keys(groupedOrdersBySeller).length} Jewellers Active
+                    </span>
+                  </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs sm:text-sm border-collapse min-w-[700px]">
-                    <thead>
-                      <tr className="border-b border-gray-200 bg-[#FAF6F0] text-gray-600">
-                        <th className="p-3">Order ID</th>
-                        <th className="p-3">Customer</th>
-                        <th className="p-3">Seller</th>
-                        <th className="p-3">Amount</th>
-                        <th className="p-3">Status</th>
-                        <th className="p-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {adminOrders.map((ord) => (
-                        <tr key={ord.id} className="hover:bg-gray-50">
-                          <td className="p-3 font-mono font-semibold text-gold-dark">{ord.id}</td>
-                          <td className="p-3">{ord.buyerName || ord.customerName || 'Priya Malhotra'}</td>
-                          <td className="p-3">{ord.sellerName || 'Jewellery Merchant'}</td>
-                          <td className="p-3 font-semibold">₹{(ord.totalAmount || 0).toLocaleString('en-IN')}</td>
-                          <td className="p-3">
-                            <span className={`text-xs px-2.5 py-0.5 rounded font-medium ${
-                              ord.status === 'Refunded' ? 'bg-emerald-100 text-emerald-800' :
-                              ord.status === 'Return Requested' ? 'bg-purple-100 text-purple-800' :
-                              ord.status === 'Cancelled' ? 'bg-rose-100 text-rose-800' :
-                              'bg-amber-50 text-amber-800 border border-amber-200'
-                            }`}>
-                              {ord.status || 'Confirmed'}
-                            </span>
-                          </td>
-                          <td className="p-3 text-right">
-                            <button
-                              onClick={() => handleDeleteAdminOrder(ord.id)}
-                              className="text-xs text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2 py-1 rounded border border-red-200 font-medium inline-flex items-center gap-1 cursor-pointer"
-                            >
-                              <Trash2 size={12} /> Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+
+                {/* Controls Bar: Search, Date Filter, Status Filter & Export Download Toolbar */}
+                <div className="bg-[#FAF6F0] p-4 border border-gray-200 rounded-sm space-y-3 shadow-2xs">
+                  {/* Top Row: Search, Date Filter Type, Date/Month Picker & Status Filter */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 flex-wrap">
+                    {/* Search Input */}
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search by Order ID, Seller, Customer or Item..."
+                        value={orderSearchQuery}
+                        onChange={(e) => setOrderSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 bg-white text-xs border border-gray-300 rounded focus:border-gold focus:outline-none"
+                      />
+                      {orderSearchQuery && (
+                        <button
+                          onClick={() => setOrderSearchQuery('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-charcoal text-xs"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Date / Time View Selector */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Calendar size={15} className="text-gold-dark shrink-0" />
+                      <select
+                        value={dateFilterType}
+                        onChange={(e) => setDateFilterType(e.target.value)}
+                        className="py-2 px-3 text-xs bg-white border border-gray-300 rounded focus:border-gold focus:outline-none font-semibold text-charcoal cursor-pointer"
+                      >
+                        <option value="ALL">📅 All Time (Any Date)</option>
+                        <option value="TODAY">⚡ Today</option>
+                        <option value="DAY">🗓️ Day-Wise View (Select Date)</option>
+                        <option value="MONTH">📆 Month-Wise View (Select Month)</option>
+                        <option value="LAST30">⏳ Last 30 Days</option>
+                      </select>
+
+                      {/* Day-Wise Picker */}
+                      {dateFilterType === 'DAY' && (
+                        <input
+                          type="date"
+                          value={selectedDate}
+                          onChange={(e) => setSelectedDate(e.target.value)}
+                          className="py-1.5 px-3 text-xs bg-white border border-gold rounded focus:outline-none font-mono text-charcoal font-semibold shadow-2xs"
+                        />
+                      )}
+
+                      {/* Month-Wise Picker */}
+                      {dateFilterType === 'MONTH' && (
+                        <input
+                          type="month"
+                          value={selectedMonth}
+                          onChange={(e) => setSelectedMonth(e.target.value)}
+                          className="py-1.5 px-3 text-xs bg-white border border-gold rounded focus:outline-none font-mono text-charcoal font-semibold shadow-2xs"
+                        />
+                      )}
+                    </div>
+
+                    {/* Status Dropdown Filter */}
+                    <div className="flex items-center gap-2">
+                      <Filter size={15} className="text-gray-500 shrink-0" />
+                      <select
+                        value={orderStatusFilter}
+                        onChange={(e) => setOrderStatusFilter(e.target.value)}
+                        className="py-2 px-3 text-xs bg-white border border-gray-300 rounded focus:border-gold focus:outline-none font-medium text-charcoal cursor-pointer"
+                      >
+                        <option value="ALL">All Order Statuses</option>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Shipped">Shipped</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Return Requested">Return Requested</option>
+                        <option value="Refunded">Refunded</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Bottom Row: Download Excel, Download PDF & Expand/Collapse Accordion Buttons */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-gray-200/80">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Download Excel / CSV Button */}
+                      <button
+                        type="button"
+                        onClick={handleExportExcel}
+                        className="py-2 px-3.5 text-xs font-semibold rounded bg-emerald-700 hover:bg-emerald-800 text-white border border-emerald-800 flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                        title="Download Filtered Orders as Excel (.csv) Sheet"
+                      >
+                        <Download size={14} /> Download Excel (.csv)
+                      </button>
+
+                      {/* Download PDF Report Button */}
+                      <button
+                        type="button"
+                        onClick={handleExportPDF}
+                        className="py-2 px-3.5 text-xs font-semibold rounded bg-red-700 hover:bg-red-800 text-white border border-red-800 flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                        title="Generate & Download PDF Governance Report"
+                      >
+                        <FileText size={14} /> Download PDF Report
+                      </button>
+                    </div>
+
+                    {/* Accordion Controls */}
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                      <button
+                        onClick={handleExpandAllSellers}
+                        className="px-3 py-1.5 text-[0.72rem] font-semibold bg-white border border-gray-300 text-charcoal hover:border-gold hover:bg-gold/10 rounded transition-all cursor-pointer shadow-2xs"
+                      >
+                        Expand All
+                      </button>
+                      <button
+                        onClick={handleCollapseAllSellers}
+                        className="px-3 py-1.5 text-[0.72rem] font-semibold bg-white border border-gray-300 text-gray-600 hover:border-gray-400 rounded transition-all cursor-pointer shadow-2xs"
+                      >
+                        Collapse All
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seller-Wise FAQ Accordion List */}
+                <div className="space-y-4">
+                  {Object.entries(groupedOrdersBySeller).length === 0 ? (
+                    <div className="bg-[#FAF6F0] p-12 text-center border border-gray-200 rounded-sm">
+                      <ShoppingBag className="mx-auto text-gray-400 mb-3" size={36} />
+                      <h4 className="font-heading text-xl text-charcoal mb-1">No Seller Orders Found</h4>
+                      <p className="text-xs text-gray-500">
+                        No orders match the current search query or selected status filter.
+                      </p>
+                    </div>
+                  ) : (
+                    Object.entries(groupedOrdersBySeller).map(([sellerKey, group]) => {
+                      const isOpen = !!openSellerAccordions[sellerKey];
+                      const sellerOrdersCount = group.orders.length;
+                      const sellerTotalRevenue = group.orders.reduce(
+                        (sum, o) => sum + (Number(o.totalAmount) || 0),
+                        0
+                      );
+                      const sellerInfo = group.sellerInfo;
+
+                      return (
+                        <div
+                          key={sellerKey}
+                          className="border border-gray-200 rounded-sm overflow-hidden bg-white shadow-2xs transition-all duration-200"
+                        >
+                          {/* FAQ Accordion Seller Header Button */}
+                          <button
+                            type="button"
+                            onClick={() => toggleSellerAccordion(sellerKey)}
+                            className={`w-full text-left p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors cursor-pointer select-none ${isOpen ? 'bg-[#FAF6F0] border-b border-gray-200' : 'bg-white hover:bg-gray-50'
+                              }`}
+                          >
+                            {/* Left Side: Seller Info */}
+                            <div className="flex items-center gap-3.5 min-w-0">
+                              <div className="w-10 h-10 rounded-full bg-gold/15 border border-gold flex items-center justify-center text-gold-dark shrink-0 font-bold font-heading text-lg">
+                                {sellerInfo?.logo ? (
+                                  <img
+                                    src={sellerInfo.logo}
+                                    alt={sellerKey}
+                                    className="w-full h-full rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <Store size={20} />
+                                )}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="font-heading text-lg text-charcoal font-semibold">
+                                    {group.sellerName}
+                                  </h4>
+                                  {sellerInfo?.verified && (
+                                    <span className="badge-approved text-[0.62rem] px-1.5 py-0.5">VERIFIED MERCHANT</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {sellerInfo?.owner ? `Owner: ${sellerInfo.owner}` : 'Verified Jeweller Partner'}
+                                  {sellerInfo?.city ? ` • ${sellerInfo.city}` : ''}
+                                  {sellerInfo?.gst ? ` • GST: ${sellerInfo.gst}` : ''}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Right Side: Order Stats Badges, Seller Export Buttons & FAQ Chevron Arrow */}
+                            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-200">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span
+                                  className={`text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider ${sellerOrdersCount > 0
+                                      ? 'bg-gold/20 text-gold-dark border border-gold/40'
+                                      : 'bg-gray-100 text-gray-500'
+                                    }`}
+                                >
+                                  {sellerOrdersCount} {sellerOrdersCount === 1 ? 'Order' : 'Orders'}
+                                </span>
+                                {sellerOrdersCount > 0 && (
+                                  <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs px-3 py-1 rounded-full font-bold">
+                                    ₹{sellerTotalRevenue.toLocaleString('en-IN')} Total
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Individual Seller Export Buttons (Excel & PDF) */}
+                              {sellerOrdersCount > 0 && (
+                                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleExportSellerExcel(sellerKey, group);
+                                    }}
+                                    className="py-1 px-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[0.7rem] font-semibold flex items-center gap-1 transition-all shadow-2xs cursor-pointer"
+                                    title={`Download ${sellerKey}'s orders as Excel (.csv)`}
+                                  >
+                                    <Download size={12} /> Excel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleExportSellerPDF(sellerKey, group);
+                                    }}
+                                    className="py-1 px-2.5 bg-red-700 hover:bg-red-800 text-white rounded text-[0.7rem] font-semibold flex items-center gap-1 transition-all shadow-2xs cursor-pointer"
+                                    title={`Download ${sellerKey}'s PDF Statement`}
+                                  >
+                                    <FileText size={12} /> PDF
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* FAQ Animated Rotating Chevron */}
+                              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gold-dark hover:bg-gold hover:text-white transition-all ml-1 shrink-0">
+                                <ChevronDown
+                                  size={20}
+                                  className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : 'rotate-0'
+                                    }`}
+                                />
+                              </div>
+                            </div>
+                          </button>
+
+                          {/* FAQ Accordion Body - Orders Table / Cards */}
+                          {isOpen && (
+                            <div className="p-4 sm:p-6 bg-white">
+                              {sellerOrdersCount === 0 ? (
+                                <div className="py-8 text-center bg-[#FAF6F0]/60 rounded border border-dashed border-gray-300">
+                                  <Package className="mx-auto text-gray-400 mb-2" size={28} />
+                                  <p className="text-xs text-gray-500 font-medium">
+                                    No orders currently assigned to {group.sellerName}.
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="space-y-4">
+                                  {group.orders.map((ord) => {
+                                    const isOrderExpanded = !!expandedOrders[ord.id];
+
+                                    return (
+                                      <div
+                                        key={ord.id}
+                                        className="border border-gray-200 rounded-sm bg-[#FAF6F0] p-3.5 sm:p-4 shadow-2xs hover:border-gold/50 transition-all"
+                                      >
+                                        {/* Compact Summary Bar (Always Visible: Order No, Customer, Date, Amount, Status, View More) */}
+                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                          {/* Left Column: Order No, Customer Name & Date */}
+                                          <div className="flex flex-wrap items-center gap-3">
+                                            {/* 1. Order Number */}
+                                            <span className="font-mono text-xs sm:text-sm font-bold text-gold-dark bg-white px-2.5 py-1 rounded border border-gold/30 shadow-2xs">
+                                              {ord.id}
+                                            </span>
+
+                                            {/* 2. Customer Name */}
+                                            <div className="flex items-center gap-1.5 text-xs text-charcoal font-semibold">
+                                              <User size={14} className="text-gold-dark shrink-0" />
+                                              <span>{ord.buyerName || ord.customerName || 'Valued Customer'}</span>
+                                            </div>
+
+                                            {/* 3. Date */}
+                                            <span className="text-xs text-gray-500 flex items-center gap-1">
+                                              <Clock size={13} className="text-gray-400 shrink-0" />
+                                              {ord.date || 'Recent'}
+                                            </span>
+                                          </div>
+
+                                          {/* Right Column: Amount, Status Dropdown, View More Button */}
+                                          <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-gray-200">
+                                            {/* 4. Total Amount */}
+                                            <div className="text-xs text-gray-600">
+                                              <span className="text-[0.68rem] uppercase text-gray-400 block sm:inline mr-1">Amount:</span>
+                                              <strong className="text-sm font-heading font-semibold text-charcoal">
+                                                ₹{(ord.totalAmount || 0).toLocaleString('en-IN')}
+                                              </strong>
+                                            </div>
+
+                                            {/* 5. Status Dropdown */}
+                                            <select
+                                              value={ord.status || 'Confirmed'}
+                                              onChange={(e) => handleUpdateAdminOrderStatus(ord.id, e.target.value)}
+                                              className={`text-xs font-bold py-1 px-2.5 rounded border focus:outline-none cursor-pointer ${ord.status === 'Delivered'
+                                                  ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                                  : ord.status === 'Shipped'
+                                                    ? 'bg-blue-100 text-blue-900 border-blue-300'
+                                                    : ord.status === 'Refunded'
+                                                      ? 'bg-purple-100 text-purple-900 border-purple-300'
+                                                      : ord.status === 'Return Requested'
+                                                        ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                                        : ord.status === 'Cancelled'
+                                                          ? 'bg-rose-100 text-rose-900 border-rose-300'
+                                                          : 'bg-gold/20 text-gold-dark border-gold/40'
+                                                }`}
+                                            >
+                                              <option value="Confirmed">Confirmed</option>
+                                              <option value="Processing">Processing</option>
+                                              <option value="Shipped">Shipped</option>
+                                              <option value="Delivered">Delivered</option>
+                                              <option value="Return Requested">Return Requested</option>
+                                              <option value="Refunded">Refunded</option>
+                                              <option value="Cancelled">Cancelled</option>
+                                            </select>
+
+                                            {/* 6. View Details / View More Toggle Button */}
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleOrderDetails(ord.id)}
+                                              className={`py-1 px-3 text-xs font-semibold rounded border transition-all flex items-center gap-1.5 cursor-pointer ${isOrderExpanded
+                                                  ? 'bg-charcoal text-white border-charcoal shadow-2xs'
+                                                  : 'bg-white text-gold-dark border-gold/50 hover:bg-gold/15'
+                                                }`}
+                                            >
+                                              {isOrderExpanded ? <EyeOff size={14} /> : <Eye size={14} />}
+                                              <span>{isOrderExpanded ? 'Hide Details' : 'View More'}</span>
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {/* Full Order Details (Shown ONLY on View More Click) */}
+                                        {isOrderExpanded && (
+                                          <div className="mt-4 pt-4 border-t border-gray-200 space-y-4 animate-fadeIn">
+                                            {/* Customer & Address & Logistics Grid */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs text-gray-600 bg-white p-3.5 rounded border border-gray-200 shadow-2xs">
+                                              <div>
+                                                <span className="text-[0.68rem] text-gray-400 uppercase font-semibold block mb-0.5">
+                                                  Customer Details
+                                                </span>
+                                                <strong className="text-charcoal block">
+                                                  {ord.buyerName || ord.customerName || 'Valued Buyer'}
+                                                </strong>
+                                                <span className="block text-gray-600">{ord.buyerEmail || 'N/A'}</span>
+                                                {ord.buyerPhone && <span className="block text-gray-600">{ord.buyerPhone}</span>}
+                                              </div>
+
+                                              <div>
+                                                <span className="text-[0.68rem] text-gray-400 uppercase font-semibold block mb-0.5">
+                                                  Dispatch Address
+                                                </span>
+                                                <span className="text-charcoal block">
+                                                  {ord.address || 'Standard Registered Dispatch Address'}
+                                                </span>
+                                              </div>
+
+                                              <div>
+                                                <span className="text-[0.68rem] text-gray-400 uppercase font-semibold block mb-0.5">
+                                                  Payment & Logistics
+                                                </span>
+                                                <span className="text-charcoal block">
+                                                  Mode: <strong>{ord.paymentMethod || 'UPI / Card'}</strong>
+                                                </span>
+                                                <span className="text-charcoal block font-mono text-[0.7rem] text-gold-dark mt-0.5">
+                                                  Tracking: {ord.trackingNumber || 'Awaiting Dispatch'}
+                                                </span>
+                                              </div>
+                                            </div>
+
+                                            {/* Purchased Items List */}
+                                            <div className="bg-white p-3.5 rounded border border-gray-200 shadow-2xs">
+                                              <span className="text-[0.68rem] text-gray-400 uppercase font-semibold block mb-2">
+                                                Ordered Items ({ord.items?.length || 1})
+                                              </span>
+                                              <div className="space-y-2">
+                                                {(ord.items && ord.items.length > 0 ? ord.items : [
+                                                  {
+                                                    name: ord.productName || 'Heritage Gold Jewellery',
+                                                    price: ord.totalAmount || 0,
+                                                    qty: 1,
+                                                    image: ord.image
+                                                  }
+                                                ]).map((item, idx) => (
+                                                  <div
+                                                    key={idx}
+                                                    className="flex items-center justify-between p-2.5 bg-[#FAF6F0] rounded border border-gray-200 text-xs gap-3"
+                                                  >
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                      {item.image && (
+                                                        <img
+                                                          src={item.image}
+                                                          alt={item.name}
+                                                          className="w-10 h-10 object-cover rounded border border-gray-200 shrink-0"
+                                                        />
+                                                      )}
+                                                      <div className="truncate">
+                                                        <strong className="text-charcoal block truncate">
+                                                          {item.name}
+                                                        </strong>
+                                                        <span className="text-gray-500 text-[0.7rem]">
+                                                          Qty: {item.qty || 1} • Price: ₹
+                                                          {(item.price || 0).toLocaleString('en-IN')}
+                                                        </span>
+                                                      </div>
+                                                    </div>
+                                                    <span className="font-semibold text-charcoal shrink-0 font-mono">
+                                                      ₹{((item.price || 0) * (item.qty || 1)).toLocaleString('en-IN')}
+                                                    </span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+
+                                            {/* Footer Actions & Order ID */}
+                                            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                                              <div className="text-xs text-gray-500">
+                                                Order Reference: <strong className="font-mono text-gold-dark">{ord.id}</strong>
+                                              </div>
+
+                                              <div className="flex items-center gap-2">
+                                                {ord.status === 'Return Requested' && (
+                                                  <button
+                                                    onClick={() => handleApproveRefund(ord)}
+                                                    className="btn-gold py-1.5 px-3 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                                                  >
+                                                    <DollarSign size={13} /> Approve Refund
+                                                  </button>
+                                                )}
+                                                <button
+                                                  onClick={() => handleDeleteAdminOrder(ord.id)}
+                                                  className="py-1.5 px-3 text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200 font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                                                >
+                                                  <Trash2 size={13} /> Delete Record
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}
@@ -1086,11 +2466,10 @@ export function AdminDashboardPage() {
                       key={preset}
                       type="button"
                       onClick={() => setSellerRejectModal((prev) => ({ ...prev, reason: preset }))}
-                      className={`text-[0.72rem] px-3 py-1.5 rounded border text-left transition-all flex items-center justify-between ${
-                        sellerRejectModal.reason === preset
+                      className={`text-[0.72rem] px-3 py-1.5 rounded border text-left transition-all flex items-center justify-between ${sellerRejectModal.reason === preset
                           ? 'bg-red-600 text-white border-red-600 font-medium shadow-xs'
                           : 'bg-gray-50 border-gray-200 hover:border-red-400 hover:bg-red-50 text-gray-700'
-                      }`}
+                        }`}
                     >
                       <span>{preset}</span>
                       {sellerRejectModal.reason === preset && <CheckCircle2 size={13} className="shrink-0 ml-2" />}

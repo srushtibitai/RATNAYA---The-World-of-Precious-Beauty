@@ -260,6 +260,17 @@ export const api = {
     });
   },
 
+  async getGstRate() {
+    return request('/admin/gst');
+  },
+
+  async updateGstRate(gstRate) {
+    return request('/admin/gst', {
+      method: 'PUT',
+      body: { gstRate }
+    });
+  },
+
   // Categories
   async getCategories() {
     return request('/categories');
@@ -525,5 +536,17 @@ export function formatDocName(docPath, fallbackName) {
   const fileName = docPath.split('/').pop();
   return fileName || fallbackName;
 }
+
+export function formatDocSize(sizeInBytesOrStr, defaultSize = '1.2 MB') {
+  if (!sizeInBytesOrStr) return defaultSize;
+  if (typeof sizeInBytesOrStr === 'number') {
+    if (sizeInBytesOrStr > 1024 * 1024) {
+      return (sizeInBytesOrStr / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+    return (sizeInBytesOrStr / 1024).toFixed(0) + ' KB';
+  }
+  return String(sizeInBytesOrStr);
+}
+
 
 

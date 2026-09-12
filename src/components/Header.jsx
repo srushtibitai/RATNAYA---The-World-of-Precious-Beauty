@@ -191,17 +191,17 @@ export function Header({
                 <div className="relative">
                   <button
                     onClick={() => setShowRoleDropdown(!showRoleDropdown)}
-                    className="bg-gold/15 hover:bg-gold/25 text-gold-dark border border-gold/40 text-xs font-semibold h-7 sm:h-auto sm:py-1 px-0 sm:px-2.5 w-7 sm:w-auto rounded-full flex items-center justify-center gap-1 cursor-pointer transition-all duration-200 shadow-sm"
+                    className="bg-gold/15 hover:bg-gold/25 text-gold-dark border border-gold/40 text-xs font-semibold py-1 px-3 rounded-full flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-200 shadow-2xs shrink-0"
                     title={currentUser.name}
                   >
                     <User size={13} className="shrink-0" />
-                    <span className="max-w-[70px] sm:max-w-[110px] truncate whitespace-nowrap hidden sm:inline">
+                    <span className="max-w-[120px] truncate whitespace-nowrap hidden sm:inline">
                       {currentUser.name}
                     </span>
-                    <span className="bg-gold-dark text-white text-[0.52rem] px-1 py-0.5 rounded font-bold uppercase tracking-wider hidden sm:inline">
+                    <span className="bg-[#9A7B3E] text-white text-[0.58rem] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider hidden sm:inline ml-0.5 shrink-0">
                       {currentUser.role}
                     </span>
-                    <ChevronDown size={10} className="hidden sm:inline" />
+                    <ChevronDown size={11} className="hidden sm:inline shrink-0" />
                   </button>
 
                   {showRoleDropdown && (
