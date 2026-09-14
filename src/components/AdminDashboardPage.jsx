@@ -41,6 +41,7 @@ import {
   Table
 } from 'lucide-react';
 import { api, openDocument, formatDocName, formatDocSize } from '../services/api';
+import InvoiceModal from './InvoiceModal';
 
 export function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -48,6 +49,12 @@ export function AdminDashboardPage() {
   // Admin state management for approvals, sellers, commissions & returns
   const [sellersList, setSellersList] = useState(INITIAL_SELLERS);
   const [adminOrders, setAdminOrders] = useState(MOCK_ORDERS);
+
+  // Invoice modal state
+  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
+  const [selectedInvoiceSeller, setSelectedInvoiceSeller] = useState(null);
+  const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('');
+  const [invoiceSellerFilter, setInvoiceSellerFilter] = useState('ALL');
 
   const [pendingSellers, setPendingSellers] = useState([]);
 
@@ -1234,6 +1241,7 @@ export function AdminDashboardPage() {
             <div className="bg-white border border-gray-200 rounded-sm overflow-hidden shadow-sm flex flex-row lg:flex-col overflow-x-auto no-scrollbar">
               {[
                 { id: 'overview', label: 'Platform Overview', icon: <TrendingUp size={18} /> },
+                { id: 'invoices', label: 'Tax Invoices', icon: <FileText size={18} /> },
                 { id: 'sellers', label: `Verified Jewellers (${sellersList.length})`, icon: <Users size={18} /> },
                 { id: 'commission', label: 'Commissions & Rates', icon: <Percent size={18} /> },
                 { id: 'seller-approvals', label: `Seller Approvals (${pendingSellers.length})`, icon: <Store size={18} /> },
@@ -1835,6 +1843,175 @@ export function AdminDashboardPage() {
               </div>
             )}
 
+            {/* TAX INVOICES GOVERNANCE TAB */}
+            {activeTab === 'invoices' && (
+              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-5">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 bg-gold/15 text-gold-dark px-3 py-1 rounded-full text-[0.68rem] font-bold uppercase tracking-wider mb-1">
+                      <FileText size={14} /> GST TAX INVOICES & BILLING
+                    </div>
+                    <h3 className="font-heading text-2xl text-charcoal">
+                      Marketplace Tax Invoices Management
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Generate, view, and print official GST tax invoices for customer orders across all verified jeweller merchants.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Summary Metrics */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-[#FAF6F0] p-5 border border-gray-200 rounded-sm">
+                    <span className="text-xs uppercase text-gray-500 font-medium">Total Orders / Invoices</span>
+                    <div className="font-heading text-2xl font-semibold text-charcoal my-1">
+                      {adminOrders.length} Invoices
+                    </div>
+                    <span className="text-xs text-gray-500">Official GST Bills</span>
+                  </div>
+
+                  <div className="bg-[#FAF6F0] p-5 border border-gray-200 rounded-sm">
+                    <span className="text-xs uppercase text-gray-500 font-medium">Total Invoiced Amount</span>
+                    <div className="font-heading text-2xl font-semibold text-gold-dark my-1">
+                      ₹{adminOrders.reduce((acc, o) => acc + (o.totalAmount || 0), 0).toLocaleString('en-IN')}
+                    </div>
+                    <span className="text-xs text-emerald-700 font-medium">Gross Sales Value</span>
+                  </div>
+
+                  <div className="bg-[#FAF6F0] p-5 border border-gray-200 rounded-sm">
+                    <span className="text-xs uppercase text-gray-500 font-medium">GST Tax (Approx. {globalGstRate}%)</span>
+                    <div className="font-heading text-2xl font-semibold text-charcoal my-1">
+                      ₹{Math.round(adminOrders.reduce((acc, o) => {
+                        const amt = o.totalAmount || 0;
+                        return acc + (amt - (amt / (1 + globalGstRate / 100)));
+                      }, 0)).toLocaleString('en-IN')}
+                    </div>
+                    <span className="text-xs text-gray-500">Government Tax Breakdown</span>
+                  </div>
+                </div>
+
+                {/* Filters Bar */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#FAF6F0] p-4 rounded-sm border border-gray-200">
+                  <div className="relative w-full sm:w-72">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                    <input
+                      type="text"
+                      placeholder="Search Invoice No, Order ID, Customer..."
+                      value={invoiceSearchQuery}
+                      onChange={(e) => setInvoiceSearchQuery(e.target.value)}
+                      className="input-field text-xs bg-white py-2"
+                      style={{ paddingLeft: '38px' }}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="flex items-center gap-2">
+                      <Filter size={14} className="text-gray-500" />
+                      <span className="text-xs font-semibold text-gray-600">Jeweller:</span>
+                    </div>
+                    <select
+                      value={invoiceSellerFilter}
+                      onChange={(e) => setInvoiceSellerFilter(e.target.value)}
+                      className="input-field text-xs bg-white py-2"
+                    >
+                      <option value="ALL">All Jeweller Sellers</option>
+                      {sellersList.map((s) => (
+                        <option key={s.id} value={s.name}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Invoices Table */}
+                <div className="overflow-x-auto border border-gray-200 rounded-sm">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#111111] text-white uppercase text-[0.7rem] tracking-wider">
+                      <tr>
+                        <th className="py-3 px-4">Invoice No</th>
+                        <th className="py-3 px-4">Order ID & Date</th>
+                        <th className="py-3 px-4">Jeweller Seller</th>
+                        <th className="py-3 px-4">Customer Details</th>
+                        <th className="py-3 px-4 text-right">Invoiced Amount</th>
+                        <th className="py-3 px-4 text-right">GST ({globalGstRate}%)</th>
+                        <th className="py-3 px-4 text-center">Status</th>
+                        <th className="py-3 px-4 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {adminOrders
+                        .filter((ord) => {
+                          const query = invoiceSearchQuery.toLowerCase();
+                          const invNo = `inv-${ord.id}`.toLowerCase();
+                          const matchesQuery = !query ||
+                            invNo.includes(query) ||
+                            (ord.id && ord.id.toLowerCase().includes(query)) ||
+                            (ord.buyerName && ord.buyerName.toLowerCase().includes(query)) ||
+                            (ord.sellerName && ord.sellerName.toLowerCase().includes(query));
+
+                          const matchesSeller = invoiceSellerFilter === 'ALL' || ord.sellerName === invoiceSellerFilter;
+
+                          return matchesQuery && matchesSeller;
+                        })
+                        .map((ord) => {
+                          const orderAmt = ord.totalAmount || 0;
+                          const gstAmt = Math.round(orderAmt - (orderAmt / (1 + globalGstRate / 100)));
+                          const sellerObj = sellersList.find((s) => s.name === ord.sellerName || s.id === ord.sellerId);
+
+                          return (
+                            <tr key={ord.id} className="hover:bg-gray-50/80 transition-colors">
+                              <td className="py-3.5 px-4 font-mono font-bold text-gold-dark">
+                                INV-{(ord.id || '').replace(/^ORD-?/i, '')}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <div className="font-mono text-charcoal font-semibold">{ord.id}</div>
+                                <div className="text-[0.68rem] text-gray-500">{ord.date || 'Recent'}</div>
+                              </td>
+                              <td className="py-3.5 px-4 font-semibold text-charcoal">
+                                {ord.sellerName || 'Verified Jeweller'}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <div className="font-semibold text-charcoal">{ord.buyerName || ord.customerName || 'Customer'}</div>
+                                <div className="text-[0.68rem] text-gray-500">{ord.buyerEmail || ''}</div>
+                              </td>
+                              <td className="py-3.5 px-4 text-right font-mono font-bold text-charcoal">
+                                ₹{orderAmt.toLocaleString('en-IN')}
+                              </td>
+                              <td className="py-3.5 px-4 text-right font-mono text-gray-600">
+                                ₹{gstAmt.toLocaleString('en-IN')}
+                              </td>
+                              <td className="py-3.5 px-4 text-center">
+                                <span className={`inline-block px-2.5 py-0.5 rounded text-[0.65rem] font-bold ${
+                                  ord.status === 'Delivered'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : ord.status === 'Shipped'
+                                    ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                    : ord.status === 'Refunded'
+                                    ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                                    : 'bg-amber-100 text-amber-900 border border-amber-300'
+                                }`}>
+                                  {ord.status || 'Confirmed'}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-center">
+                                <button
+                                  onClick={() => {
+                                    setSelectedInvoiceOrder(ord);
+                                    setSelectedInvoiceSeller(sellerObj);
+                                  }}
+                                  className="btn-gold py-1.5 px-3 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shadow-xs whitespace-nowrap"
+                                >
+                                  <FileText size={14} /> View Tax Invoice
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* ORDERS & LOGISTICS TAB - SELLER-WISE FAQ ACCORDION DESIGN */}
             {activeTab === 'orders' && (
               <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm space-y-6">
@@ -1869,13 +2046,14 @@ export function AdminDashboardPage() {
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 flex-wrap">
                     {/* Search Input */}
                     <div className="relative flex-1 min-w-[200px]">
-                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                       <input
                         type="text"
                         placeholder="Search by Order ID, Seller, Customer or Item..."
                         value={orderSearchQuery}
                         onChange={(e) => setOrderSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-white text-xs border border-gray-300 rounded focus:border-gold focus:outline-none"
+                        className="w-full pr-4 py-2 bg-white text-xs border border-gray-300 rounded focus:border-gold focus:outline-none"
+                        style={{ paddingLeft: '38px' }}
                       />
                       {orderSearchQuery && (
                         <button
@@ -2182,7 +2360,21 @@ export function AdminDashboardPage() {
                                               <option value="Cancelled">Cancelled</option>
                                             </select>
 
-                                            {/* 6. View Details / View More Toggle Button */}
+                                            {/* 6. View Tax Invoice Button */}
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedInvoiceOrder(ord);
+                                                setSelectedInvoiceSeller(sellerInfo);
+                                              }}
+                                              className="py-1 px-3 text-xs font-semibold rounded border bg-gold/10 text-gold-dark border-gold/40 hover:bg-gold/20 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                              title="View / Print Official Tax Invoice"
+                                            >
+                                              <FileText size={14} />
+                                              <span>Invoice</span>
+                                            </button>
+
+                                            {/* 7. View Details / View More Toggle Button */}
                                             <button
                                               type="button"
                                               onClick={() => toggleOrderDetails(ord.id)}
@@ -2508,6 +2700,15 @@ export function AdminDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Tax Invoice Printable Modal */}
+      <InvoiceModal
+        order={selectedInvoiceOrder}
+        isOpen={Boolean(selectedInvoiceOrder)}
+        onClose={() => setSelectedInvoiceOrder(null)}
+        sellerDetails={selectedInvoiceSeller}
+        globalGstRate={globalGstRate}
+      />
     </div>
   );
 }
