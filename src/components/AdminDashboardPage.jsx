@@ -38,10 +38,12 @@ import {
   Calendar,
   FileText,
   Download,
-  Table
+  Table,
+  PieChart
 } from 'lucide-react';
 import { api, openDocument, formatDocName, formatDocSize } from '../services/api';
 import InvoiceModal from './InvoiceModal';
+import FinancialReportsView from './FinancialReportsView';
 
 export function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -1241,6 +1243,7 @@ export function AdminDashboardPage() {
             <div className="bg-white border border-gray-200 rounded-sm overflow-hidden shadow-sm flex flex-row lg:flex-col overflow-x-auto no-scrollbar">
               {[
                 { id: 'overview', label: 'Platform Overview', icon: <TrendingUp size={18} /> },
+                { id: 'reports', label: 'Selling & Financial Reports', icon: <PieChart size={18} /> },
                 { id: 'invoices', label: 'Tax Invoices', icon: <FileText size={18} /> },
                 { id: 'sellers', label: `Verified Jewellers (${sellersList.length})`, icon: <Users size={18} /> },
                 { id: 'commission', label: 'Commissions & Rates', icon: <Percent size={18} /> },
@@ -1841,6 +1844,16 @@ export function AdminDashboardPage() {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* SELLING, PAYMENT & RETURN REPORTS TAB */}
+            {activeTab === 'reports' && (
+              <FinancialReportsView
+                orders={adminOrders}
+                userRole="admin"
+                sellersList={sellersList}
+                globalGstRate={globalGstRate}
+              />
             )}
 
             {/* TAX INVOICES GOVERNANCE TAB */}

@@ -31,9 +31,11 @@ import {
   Phone,
   Mail,
   FileText,
-  Search
+  Search,
+  PieChart
 } from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
+import FinancialReportsView from './FinancialReportsView';
 
 export function SellerDashboardPage({ currentUser, sellerId }) {
   const sellerFromData = SELLERS.find((s) => s.id === sellerId || s.id === currentUser?.id || s.id === currentUser?.sellerId);
@@ -571,6 +573,7 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
             <div className="bg-white border border-gray-200 rounded-sm overflow-hidden shadow-sm flex flex-row lg:flex-col overflow-x-auto no-scrollbar">
               {[
                 { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={18} /> },
+                { id: 'reports', label: 'Selling & Financial Reports', icon: <PieChart size={18} /> },
                 { id: 'invoices', label: 'Tax Invoices', icon: <FileText size={18} /> },
                 { id: 'products', label: `My Products (${sellerProductsList.length})`, icon: <Package size={18} /> },
                 { id: 'add-product', label: 'Add New Product', icon: <PlusCircle size={18} /> },
@@ -1077,6 +1080,16 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* SELLING, PAYMENT & RETURN REPORTS TAB */}
+            {activeTab === 'reports' && (
+              <FinancialReportsView
+                orders={sellerOrders}
+                userRole="seller"
+                sellerInfo={sellerProfile}
+                globalGstRate={3}
+              />
             )}
 
             {/* TAX INVOICES TAB */}
