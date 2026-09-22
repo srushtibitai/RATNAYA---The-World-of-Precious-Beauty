@@ -1,7 +1,7 @@
 // RATNAYA — Frontend REST API Service Integration
 
-// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://ratnaya-backend.onrender.com/api';
-const API_BASE_URL = 'http://localhost:5050/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://ratnaya-backend.onrender.com/api';
+// const API_BASE_URL = 'http://localhost:5050/api';
 
 export function getImageUrl(imagePath) {
   if (!imagePath) return '';
