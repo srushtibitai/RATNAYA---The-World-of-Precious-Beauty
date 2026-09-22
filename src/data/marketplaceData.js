@@ -1671,8 +1671,23 @@ export const BLOG_POSTS = [
 
 export const MOCK_ORDERS = [
   {
+    id: 'RAT-ORD-91054',
+    date: '2026-09-22',
+    buyerName: 'Aarti Kapoor',
+    buyerEmail: 'aarti.kapoor@gmail.com',
+    buyerPhone: '+91 98765 43210',
+    totalAmount: 175000,
+    status: 'Order Requested',
+    trackingNumber: 'PENDING-SELLER-ACCEPTANCE',
+    items: [
+      { productId: 'prod-req-101', name: '22K Gold Antique Choker Necklace', price: 175000, qty: 1, sellerName: 'Kundan Jewels Jaipur' }
+    ],
+    paymentMethod: 'Prepaid (UPI / Card)',
+    address: 'B-204, Royal Palms, C-Scheme, Jaipur 302001'
+  },
+  {
     id: 'RAT-ORD-88219',
-    date: '2026-08-28',
+    date: '2026-09-20',
     buyerName: 'Priya Malhotra',
     buyerEmail: 'priya.m@gmail.com',
     buyerPhone: '+91 98201 44510',
@@ -1680,10 +1695,97 @@ export const MOCK_ORDERS = [
     status: 'Shipped',
     trackingNumber: 'BLUEDART-8891230',
     items: [
-      { productId: 'prod-1', name: 'Gold Bangle Pair', price: 142000, qty: 1, sellerName: 'Heritage Gold Kolkata' }
+      { productId: 'prod-1', name: 'Royal Maharani Kundan Haar', price: 245000, qty: 1, sellerName: 'Kundan Jewels Jaipur' }
     ],
     paymentMethod: 'UPI (GPay)',
     address: 'Flat 402, Sea Pearl Towers, Worli, Mumbai 400018'
+  },
+  {
+    id: 'RAT-ORD-88220',
+    date: '2026-09-21',
+    buyerName: 'Vikramaditya Sharma',
+    buyerEmail: 'vikram.s@outlook.com',
+    buyerPhone: '+91 98112 33401',
+    totalAmount: 185000,
+    status: 'Confirmed',
+    trackingNumber: 'DELHIVERY-7749102',
+    items: [
+      { productId: 'prod-2', name: 'Solitaire Diamond Engagement Ring', price: 185000, qty: 1, sellerName: 'Veda Diamonds Mumbai' }
+    ],
+    paymentMethod: 'Credit Card (Razorpay)',
+    address: 'House No 45, Civil Lines, Jaipur 302006'
+  },
+  {
+    id: 'RAT-ORD-88215',
+    date: '2026-09-15',
+    buyerName: 'Ananya Singhania',
+    buyerEmail: 'ananya.singhania@gmail.com',
+    buyerPhone: '+91 99304 55120',
+    totalAmount: 320000,
+    status: 'Delivered',
+    trackingNumber: 'BLUEDART-9918234',
+    items: [
+      { productId: 'prod-3', name: 'Zambian Emerald & Diamond Choker', price: 320000, qty: 1, sellerName: 'Heritage Gold Kolkata' }
+    ],
+    paymentMethod: 'Net Banking (HDFC)',
+    address: '12-A, Jubilee Hills, Hyderabad 500033'
+  },
+  {
+    id: 'RAT-ORD-88208',
+    date: '2026-09-08',
+    buyerName: 'Rohan Mehra',
+    buyerEmail: 'rohan.m@yahoo.com',
+    buyerPhone: '+91 97110 88231',
+    totalAmount: 95000,
+    status: 'Return Requested',
+    trackingNumber: 'BLUEDART-3321904',
+    returnDetails: {
+      reason: 'Size mismatch on gold band',
+      requestDate: '2026-09-12',
+      comments: 'Ring size 14 was slightly too tight.',
+      refundMethod: 'Original Source (UPI)'
+    },
+    items: [
+      { productId: 'prod-4', name: '22K Gold Filigree Bangle Pair', price: 95000, qty: 1, sellerName: 'Kundan Jewels Jaipur' }
+    ],
+    paymentMethod: 'UPI (PhonePe)',
+    address: 'Flat 801, Prestige Palms, Whitefield, Bengaluru 560066'
+  },
+  {
+    id: 'RAT-ORD-88195',
+    date: '2026-08-25',
+    buyerName: 'Kavita Sundaram',
+    buyerEmail: 'kavita.sun@gmail.com',
+    buyerPhone: '+91 94440 12903',
+    totalAmount: 148000,
+    status: 'Refunded',
+    trackingNumber: 'DELHIVERY-1109482',
+    refundDetails: {
+      refundAmount: 148000,
+      refundTxnId: 'RFND-UPI-992183',
+      refundDate: '2026-08-30'
+    },
+    items: [
+      { productId: 'prod-5', name: 'Nizam Polki Uncut Diamond Earrings', price: 148000, qty: 1, sellerName: 'Royal Nizam Polki Hyderabad' }
+    ],
+    paymentMethod: 'UPI (GPay)',
+    address: 'Plot 14, Anna Nagar West, Chennai 600040'
+  },
+  {
+    id: 'RAT-ORD-88180',
+    date: '2026-08-14',
+    buyerName: 'Sunil Agarwal',
+    buyerEmail: 'sunil.agarwal@corp.in',
+    buyerPhone: '+91 98300 77412',
+    totalAmount: 76000,
+    status: 'Cancelled',
+    cancellationReason: 'Cancelled by customer before dispatch',
+    cancelledAt: '2026-08-15',
+    items: [
+      { productId: 'prod-6', name: 'Lotus Motif Gold Pendant', price: 76000, qty: 1, sellerName: 'Heritage Gold Kolkata' }
+    ],
+    paymentMethod: 'Credit Card',
+    address: 'Flat 5B, Salt Lake Sector 1, Kolkata 700064'
   }
 ];
 

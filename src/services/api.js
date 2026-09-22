@@ -1,7 +1,7 @@
 // RATNAYA — Frontend REST API Service Integration
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://ratnaya-backend.onrender.com/api';
-// const API_BASE_URL = 'http://localhost:5050/api';
+// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://ratnaya-backend.onrender.com/api';
+const API_BASE_URL = 'http://localhost:5050/api';
 
 export function getImageUrl(imagePath) {
   if (!imagePath) return '';
@@ -190,6 +190,11 @@ export const api = {
     return request('/orders');
   },
 
+  async getSellerOrders(sellerId) {
+    const query = sellerId ? `?sellerId=${encodeURIComponent(sellerId)}` : '';
+    return request(`/orders/seller/my-orders${query}`);
+  },
+
   async createOrder(orderData) {
     return request('/orders', {
       method: 'POST',
@@ -355,9 +360,16 @@ export const api = {
     });
   },
 
-  // Scoped Products & Orders API
-  async getSellerProducts() {
-    return request('/products/seller/my-products');
+  async getSellerProducts(sellerId = 'seller-1') {
+    const res = await request(`/products/seller/my-products?sellerId=${sellerId}`);
+    if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+      return res;
+    }
+    const publicRes = await request(`/products?sellerId=${sellerId}&status=all`);
+    if (publicRes && publicRes.success && Array.isArray(publicRes.data)) {
+      return publicRes;
+    }
+    return res || { success: false, data: [] };
   },
 
   async getBuyerOrders() {

@@ -75,8 +75,8 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   const handleQuickDemoLogin = (role) => {
     let demoUser = {
       id: role === 'ADMIN' ? 'admin-1' : role === 'SELLER' ? 'seller-1' : 'buyer-1',
-      name: role === 'ADMIN' ? 'Ratnaya Super Admin' : role === 'SELLER' ? 'Heritage Gold Kolkata' : 'Priya Malhotra',
-      email: role === 'ADMIN' ? 'admin@ratnaya.com' : role === 'SELLER' ? 'heritage@ratnaya.com' : 'priya.m@gmail.com',
+      name: role === 'ADMIN' ? 'Ratnaya Super Admin' : role === 'SELLER' ? 'Kundan Jewels Jaipur' : 'Priya Malhotra',
+      email: role === 'ADMIN' ? 'admin@ratnaya.com' : role === 'SELLER' ? 'kundan@ratnaya.com' : 'priya.m@gmail.com',
       role,
       commissionRate: role === 'SELLER' ? 10 : 0
     };

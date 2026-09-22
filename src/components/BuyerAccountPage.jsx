@@ -541,7 +541,7 @@ export function BuyerAccountPage({ user, wishlistItems = [], onAddToCart, onNavi
                 <div className="flex flex-col gap-6">
                   {ordersList
                     .filter((order) => {
-                      if (ordersFilter === 'Active') return ['Confirmed', 'Shipped', 'Processing'].includes(order.status);
+                      if (ordersFilter === 'Active') return ['Order Requested', 'Pending Acceptance', 'Confirmed', 'Shipped', 'Processing'].includes(order.status);
                       if (ordersFilter === 'Returned / Refunded') return ['Return Requested', 'Refunded'].includes(order.status);
                       if (ordersFilter === 'Cancelled') return order.status === 'Cancelled';
                       return true;
@@ -570,6 +570,11 @@ export function BuyerAccountPage({ user, wishlistItems = [], onAddToCart, onNavi
                             </div>
 
                             <div className="flex items-center gap-3">
+                              {(order.status === 'Order Requested' || order.status === 'Pending Acceptance') && (
+                                <span className="bg-amber-100 text-amber-950 border border-amber-300 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1 shadow-2xs">
+                                  <Clock size={12} className="text-amber-600 animate-pulse" /> Awaiting Jeweller Acceptance
+                                </span>
+                              )}
                               {order.status === 'Delivered' && (
                                 <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
                                   <CheckCircle2 size={12} /> Delivered

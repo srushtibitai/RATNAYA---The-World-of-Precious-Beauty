@@ -32,7 +32,11 @@ import {
   Mail,
   FileText,
   Search,
-  PieChart
+  PieChart,
+  Filter,
+  ChevronDown,
+  ChevronUp,
+  Eye
 } from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
 import FinancialReportsView from './FinancialReportsView';
@@ -75,6 +79,14 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
   const [activeTab, setActiveTab] = useState(seller.status !== 'Approved' ? 'store-profile' : 'overview');
   const [sellerOrders, setSellerOrders] = useState([]);
   const [sellerProductsList, setSellerProductsList] = useState([]);
+  const [expandedOrders, setExpandedOrders] = useState({});
+
+  const toggleOrderExpand = (orderId) => {
+    setExpandedOrders((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId]
+    }));
+  };
 
   // Invoice modal & search state
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
@@ -187,8 +199,9 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
     let isMounted = true;
     async function loadSellerProducts() {
       try {
-        const res = await api.getSellerProducts();
-        if (isMounted && res && res.success && Array.isArray(res.data)) {
+        const targetId = currentUser?.sellerId || currentUser?.id || sellerId || 'seller-1';
+        const res = await api.getSellerProducts(targetId);
+        if (isMounted && res && res.success && Array.isArray(res.data) && res.data.length > 0) {
           setSellerProductsList(res.data);
         } else if (isMounted) {
           const filtered = PRODUCTS.filter(
@@ -204,26 +217,122 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
     return () => {
       isMounted = false;
     };
-  }, [activeTab, seller.id, seller.name]);
+  }, [activeTab, seller.id, seller.name, currentUser?.id]);
 
-  // Load Seller Scoped Orders
+  // Merchant Order Filters & Sorting State
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState('All');
+  const [orderDateFilter, setOrderDateFilter] = useState('All');
+  const [orderSortBy, setOrderSortBy] = useState('newest');
+
+  // Load Seller Scoped Orders with MOCK_ORDERS Fallback
   useEffect(() => {
     let isMounted = true;
     async function loadSellerOrders() {
       try {
-        const res = await api.getSellerOrders();
-        if (isMounted && res && res.success && Array.isArray(res.data)) {
+        const targetId = currentUser?.sellerId || currentUser?.id || sellerId || 'seller-1';
+        const res = await api.getSellerOrders(targetId);
+        if (isMounted && res && res.success && Array.isArray(res.data) && res.data.length > 0) {
           setSellerOrders(res.data);
+        } else if (isMounted) {
+          // Fallback to MOCK_ORDERS filtered by sellerId / sellerName
+          const filteredMock = MOCK_ORDERS.filter((o) => {
+            if (o.sellerId === seller.id || o.sellerName === seller.name) return true;
+            if (Array.isArray(o.items)) {
+              return o.items.some((i) => i.sellerId === seller.id || i.sellerName === seller.name);
+            }
+            return false;
+          });
+          setSellerOrders(filteredMock.length > 0 ? filteredMock : MOCK_ORDERS);
         }
       } catch (err) {
         console.warn('Seller orders API load error:', err);
+        if (isMounted) {
+          setSellerOrders(MOCK_ORDERS);
+        }
       }
     }
     loadSellerOrders();
     return () => {
       isMounted = false;
     };
-  }, [activeTab]);
+  }, [activeTab, seller.id, seller.name, currentUser?.id]);
+
+  // Derived Filtered & Sorted Merchant Orders
+  const filteredSellerOrders = sellerOrders
+    .filter((ord) => {
+      // 1. Search Query Filter (Order ID, Buyer Name, Buyer Email, Product Item Name)
+      if (orderSearchQuery.trim()) {
+        const query = orderSearchQuery.toLowerCase().trim();
+        const matchesId = (ord.id || '').toLowerCase().includes(query);
+        const matchesBuyer = (ord.buyerName || ord.customerName || '').toLowerCase().includes(query);
+        const matchesEmail = (ord.buyerEmail || '').toLowerCase().includes(query);
+        const matchesItems = Array.isArray(ord.items) && ord.items.some((item) => (item.name || '').toLowerCase().includes(query));
+        if (!matchesId && !matchesBuyer && !matchesEmail && !matchesItems) return false;
+      }
+
+      // 2. Status Filter
+      if (orderStatusFilter !== 'All') {
+        const status = ord.status || 'Confirmed';
+        if (status !== orderStatusFilter) return false;
+      }
+
+      // 3. Date Range Filter
+      if (orderDateFilter !== 'All') {
+        const rawDate = ord.date || ord.createdAt;
+        if (rawDate) {
+          const orderDate = new Date(rawDate);
+          const now = new Date();
+          if (!isNaN(orderDate.getTime())) {
+            if (orderDateFilter === 'today') {
+              if (orderDate.toDateString() !== now.toDateString()) return false;
+            } else if (orderDateFilter === '7days') {
+              const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
+              if (diffDays > 7) return false;
+            } else if (orderDateFilter === '30days') {
+              const diffDays = (now - orderDate) / (1000 * 60 * 60 * 24);
+              if (diffDays > 30) return false;
+            }
+          }
+        }
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      // 4. Sorting logic
+      if (orderSortBy === 'newest') {
+        return new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0);
+      } else if (orderSortBy === 'oldest') {
+        return new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0);
+      } else if (orderSortBy === 'amount-high') {
+        return (b.totalAmount || 0) - (a.totalAmount || 0);
+      } else if (orderSortBy === 'amount-low') {
+        return (a.totalAmount || 0) - (b.totalAmount || 0);
+      }
+      return 0;
+    });
+
+  // Calculate status counts for quick filter pills & dropdown options
+  const statusCounts = {
+    All: sellerOrders.length,
+    'Order Requested': sellerOrders.filter((o) => o.status === 'Order Requested' || o.status === 'Pending Acceptance').length,
+    Confirmed: sellerOrders.filter((o) => o.status === 'Confirmed').length,
+    Shipped: sellerOrders.filter((o) => o.status === 'Shipped').length,
+    Delivered: sellerOrders.filter((o) => o.status === 'Delivered').length,
+    'Return Requested': sellerOrders.filter((o) => o.status === 'Return Requested').length,
+    Refunded: sellerOrders.filter((o) => o.status === 'Refunded').length,
+    Cancelled: sellerOrders.filter((o) => o.status === 'Cancelled').length
+  };
+
+  const isOrderFilterActive = orderSearchQuery.trim() !== '' || orderStatusFilter !== 'All' || orderDateFilter !== 'All' || orderSortBy !== 'newest';
+
+  const handleResetOrderFilters = () => {
+    setOrderSearchQuery('');
+    setOrderStatusFilter('All');
+    setOrderDateFilter('All');
+    setOrderSortBy('newest');
+  };
 
   const handleSaveSellerProfile = async (e) => {
     e.preventDefault();
@@ -1252,180 +1361,433 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                       Manage client orders, track insured shipments, update delivery statuses, and handle return requests.
                     </p>
                   </div>
-                  <span className="badge-gold text-xs">{sellerOrders.length} Total Orders</span>
+                  <div className="flex items-center gap-2">
+                    <span className="badge-gold text-xs">{sellerOrders.length} Total Orders</span>
+                    {isOrderFilterActive && (
+                      <span className="bg-gold/20 text-gold-dark text-xs px-2.5 py-1 rounded-full font-semibold border border-gold/30">
+                        {filteredSellerOrders.length} Filtered
+                      </span>
+                    )}
+                  </div>
                 </div>
 
+                {/* Quick Status Filter Pills */}
+                {sellerOrders.length > 0 && (
+                  <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 no-scrollbar">
+                    {[
+                      { id: 'All', label: 'All Orders', count: statusCounts.All },
+                      { id: 'Order Requested', label: 'New Requests 🔔', count: statusCounts['Order Requested'] },
+                      { id: 'Confirmed', label: 'Confirmed', count: statusCounts.Confirmed },
+                      { id: 'Shipped', label: 'Shipped', count: statusCounts.Shipped },
+                      { id: 'Delivered', label: 'Delivered', count: statusCounts.Delivered },
+                      { id: 'Return Requested', label: 'Return Requests', count: statusCounts['Return Requested'] },
+                      { id: 'Refunded', label: 'Refunded', count: statusCounts.Refunded },
+                      { id: 'Cancelled', label: 'Cancelled', count: statusCounts.Cancelled }
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setOrderStatusFilter(tab.id)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                          orderStatusFilter === tab.id
+                            ? 'bg-gold-dark text-white font-semibold shadow-xs'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        <span
+                          className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                            orderStatusFilter === tab.id
+                              ? 'bg-white/20 text-white'
+                              : 'bg-gray-200 text-gray-700'
+                          }`}
+                        >
+                          {tab.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Search & Filter Controls Bar */}
+                {sellerOrders.length > 0 && (
+                  <div className="bg-[#FAF6F0] p-4 rounded border border-gray-200 mb-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-2xs">
+                    {/* Search Box */}
+                    <div className="relative flex-1">
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search by Order ID, Buyer Name, Email, or Item..."
+                        value={orderSearchQuery}
+                        onChange={(e) => setOrderSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-gray-300 rounded focus:border-gold focus:outline-none transition-colors"
+                      />
+                      {orderSearchQuery && (
+                        <button
+                          onClick={() => setOrderSearchQuery('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Dropdowns & Actions */}
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      {/* Status Dropdown */}
+                      <div className="flex items-center gap-1">
+                        <Filter size={13} className="text-gray-500 shrink-0" />
+                        <select
+                          value={orderStatusFilter}
+                          onChange={(e) => setOrderStatusFilter(e.target.value)}
+                          className="bg-white border border-gray-300 text-xs py-2 px-2.5 rounded font-medium text-charcoal focus:border-gold focus:outline-none cursor-pointer"
+                        >
+                          <option value="All">All Statuses ({statusCounts.All})</option>
+                          <option value="Order Requested">New Requests 🔔 ({statusCounts['Order Requested']})</option>
+                          <option value="Confirmed">Confirmed ({statusCounts.Confirmed})</option>
+                          <option value="Shipped">Shipped ({statusCounts.Shipped})</option>
+                          <option value="Delivered">Delivered ({statusCounts.Delivered})</option>
+                          <option value="Return Requested">Return Requested ({statusCounts['Return Requested']})</option>
+                          <option value="Refunded">Refunded ({statusCounts.Refunded})</option>
+                          <option value="Cancelled">Cancelled ({statusCounts.Cancelled})</option>
+                        </select>
+                      </div>
+
+                      {/* Date Filter Dropdown */}
+                      <select
+                        value={orderDateFilter}
+                        onChange={(e) => setOrderDateFilter(e.target.value)}
+                        className="bg-white border border-gray-300 text-xs py-2 px-2.5 rounded font-medium text-charcoal focus:border-gold focus:outline-none cursor-pointer"
+                      >
+                        <option value="All">All Dates</option>
+                        <option value="today">Today</option>
+                        <option value="7days">Last 7 Days</option>
+                        <option value="30days">Last 30 Days</option>
+                      </select>
+
+                      {/* Sort By Dropdown */}
+                      <select
+                        value={orderSortBy}
+                        onChange={(e) => setOrderSortBy(e.target.value)}
+                        className="bg-white border border-gray-300 text-xs py-2 px-2.5 rounded font-medium text-charcoal focus:border-gold focus:outline-none cursor-pointer"
+                      >
+                        <option value="newest">Sort: Newest First</option>
+                        <option value="oldest">Sort: Oldest First</option>
+                        <option value="amount-high">Amount: High to Low</option>
+                        <option value="amount-low">Amount: Low to High</option>
+                      </select>
+
+                      {/* Reset Filters Button */}
+                      {isOrderFilterActive && (
+                        <button
+                          onClick={handleResetOrderFilters}
+                          className="py-2 px-3 text-xs bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded font-medium transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+                          title="Reset all search and filter criteria"
+                        >
+                          <RotateCcw size={12} /> Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Showing Results Indicator */}
+                {sellerOrders.length > 0 && isOrderFilterActive && (
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-4 px-1">
+                    <span>
+                      Showing <strong>{filteredSellerOrders.length}</strong> of <strong>{sellerOrders.length}</strong> orders
+                    </span>
+                    <button onClick={handleResetOrderFilters} className="text-gold-dark hover:underline font-medium cursor-pointer">
+                      Clear all filters
+                    </button>
+                  </div>
+                )}
+
+                {/* Orders List or Empty State */}
                 {sellerOrders.length === 0 ? (
                   <div className="bg-[#FAF6F0] p-12 text-center border border-gray-200 rounded-sm">
                     <ShoppingBag className="mx-auto text-gold-dark mb-3" size={36} />
                     <h4 className="font-heading text-xl text-charcoal mb-1">No Orders Found</h4>
                     <p className="text-xs text-gray-500">New orders placed for your jewellery pieces will appear here.</p>
                   </div>
+                ) : filteredSellerOrders.length === 0 ? (
+                  <div className="bg-[#FAF6F0] p-12 text-center border border-gray-200 rounded-sm">
+                    <Search className="mx-auto text-gold-dark mb-3" size={32} />
+                    <h4 className="font-heading text-lg text-charcoal mb-1">No Matching Orders Found</h4>
+                    <p className="text-xs text-gray-500 mb-4">No order records match your search query or selected filters.</p>
+                    <button
+                      onClick={handleResetOrderFilters}
+                      className="btn-gold py-2 px-4 text-xs font-semibold uppercase tracking-wider inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <RotateCcw size={14} /> Clear Search & Filters
+                    </button>
+                  </div>
                 ) : (
-                  <div className="flex flex-col gap-6">
-                    {sellerOrders.map((ord) => (
-                      <div key={ord.id} className="border border-gray-200 rounded-sm p-5 bg-[#FAF6F0] shadow-xs">
-                        {/* Header */}
-                        <div className="flex flex-col sm:flex-row justify-between pb-4 mb-4 border-b border-gray-200 gap-2">
-                          <div>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1 px-1">
+                      <span>Click <strong>"View More"</strong> on any order row to view items, address, status controls & tax invoice.</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const allExpanded = {};
+                            filteredSellerOrders.forEach((o) => { allExpanded[o.id] = true; });
+                            setExpandedOrders(allExpanded);
+                          }}
+                          className="text-[0.72rem] text-gold-dark hover:underline font-medium cursor-pointer"
+                        >
+                          Expand All
+                        </button>
+                        <span className="text-gray-300">|</span>
+                        <button
+                          onClick={() => setExpandedOrders({})}
+                          className="text-[0.72rem] text-gray-500 hover:underline font-medium cursor-pointer"
+                        >
+                          Collapse All
+                        </button>
+                      </div>
+                    </div>
+
+                    {filteredSellerOrders.map((ord) => (
+                      <div key={ord.id} className="border border-gray-200 rounded-sm bg-white shadow-2xs overflow-hidden transition-all">
+                        {/* SINGLE LINE COMPACT SUMMARY ROW */}
+                        <div className="p-3 sm:p-4 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 hover:bg-amber-50/20 transition-colors">
+                          <div className="flex flex-wrap items-center gap-3 min-w-0">
                             <div className="flex items-center gap-2">
                               <strong className="text-sm font-heading tracking-wide text-charcoal">{ord.id}</strong>
-                              <span className="text-xs text-gray-400">•</span>
-                              <span className="text-xs text-gray-500">Placed on {ord.date}</span>
+                              <span className="text-xs text-gray-300">•</span>
+                              <span className="text-xs text-gray-500 whitespace-nowrap">{ord.date || 'Recent'}</span>
                             </div>
-                            <span className="text-xs text-gray-600 block mt-0.5">
-                              Buyer: <strong>{ord.buyerName || ord.customerName || 'Priya Malhotra'}</strong> ({ord.buyerEmail || 'priya.m@gmail.com'})
-                            </span>
+
+                            <span className="text-xs text-gray-300 hidden md:inline">|</span>
+
+                            <div className="text-xs text-gray-600 truncate max-w-[260px]" title={`${ord.buyerName || ord.customerName || 'Customer'} (${ord.buyerEmail || ''})`}>
+                              <span className="text-gray-400">Buyer:</span> <strong>{ord.buyerName || ord.customerName || 'Priya Malhotra'}</strong>
+                            </div>
+
+                            {ord.items && ord.items.length > 0 && (
+                              <span className="text-[0.68rem] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium hidden lg:inline-block">
+                                {ord.items.length} {ord.items.length === 1 ? 'item' : 'items'}
+                              </span>
+                            )}
                           </div>
 
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                            {/* Status Badge */}
+                            {(ord.status === 'Order Requested' || ord.status === 'Pending Acceptance') && (
+                              <span className="bg-amber-100 text-amber-950 border border-amber-300 text-[0.68rem] px-2.5 py-1 rounded-full font-bold flex items-center gap-1 shadow-2xs">
+                                <AlertCircle size={11} className="text-amber-600 animate-pulse" /> New Request 🔔
+                              </span>
+                            )}
                             {ord.status === 'Delivered' && (
-                              <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
-                                <CheckCircle2 size={12} /> Delivered
+                              <span className="bg-emerald-100 text-emerald-800 text-[0.68rem] px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                <CheckCircle2 size={11} /> Delivered
                               </span>
                             )}
                             {ord.status === 'Shipped' && (
-                              <span className="bg-blue-100 text-blue-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
-                                <Truck size={12} /> In Transit
+                              <span className="bg-blue-100 text-blue-800 text-[0.68rem] px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                <Truck size={11} /> In Transit
                               </span>
                             )}
                             {ord.status === 'Confirmed' && (
-                              <span className="bg-amber-100 text-amber-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
-                                <Clock size={12} /> Order Confirmed
+                              <span className="bg-amber-100 text-amber-800 text-[0.68rem] px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                <Clock size={11} /> Confirmed
                               </span>
                             )}
                             {ord.status === 'Return Requested' && (
-                              <span className="bg-purple-100 text-purple-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
-                                <RotateCcw size={12} /> Return Requested
+                              <span className="bg-purple-100 text-purple-800 text-[0.68rem] px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                <RotateCcw size={11} /> Return Req.
                               </span>
                             )}
                             {ord.status === 'Refunded' && (
-                              <span className="bg-emerald-600 text-white text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
-                                <DollarSign size={12} /> Refunded
+                              <span className="bg-emerald-600 text-white text-[0.68rem] px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                <DollarSign size={11} /> Refunded
                               </span>
                             )}
                             {ord.status === 'Cancelled' && (
-                              <span className="bg-rose-100 text-rose-800 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
-                                <XCircle size={12} /> Cancelled
+                              <span className="bg-rose-100 text-rose-800 text-[0.68rem] px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                                <XCircle size={11} /> Cancelled
                               </span>
                             )}
 
-                            <strong className="text-base text-charcoal font-heading">
+                            {/* Total Amount */}
+                            <strong className="text-sm sm:text-base text-charcoal font-heading min-w-[80px] text-right">
                               ₹{(ord.totalAmount || 0).toLocaleString('en-IN')}
                             </strong>
+
+                            {/* VIEW MORE / VIEW LESS TOGGLE BUTTON */}
+                            <button
+                              onClick={() => toggleOrderExpand(ord.id)}
+                              className={`py-1.5 px-3 text-xs font-semibold rounded flex items-center gap-1.5 transition-all cursor-pointer ${
+                                expandedOrders[ord.id]
+                                  ? 'bg-charcoal text-white shadow-xs'
+                                  : 'bg-gold-dark text-white hover:bg-gold transition-colors shadow-2xs'
+                              }`}
+                              title={expandedOrders[ord.id] ? 'Click to collapse details' : 'Click to view full order details'}
+                            >
+                              <span>{expandedOrders[ord.id] ? 'View Less' : 'View More'}</span>
+                              {expandedOrders[ord.id] ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                            </button>
                           </div>
                         </div>
 
-                        {/* Items Purchased */}
-                        {ord.items && ord.items.length > 0 && (
-                          <div className="mb-4 space-y-2">
-                            {ord.items.map((item, idx) => (
-                              <div key={idx} className="flex justify-between items-center text-xs bg-white p-2.5 rounded border border-gray-100">
+                        {/* EXPANDABLE ORDER DETAILS SECTION (ONLY SHOWN WHEN VIEW MORE IS CLICKED) */}
+                        {expandedOrders[ord.id] && (
+                          <div className="p-4 sm:p-5 bg-[#FAF6F0] space-y-4 animate-fadeIn border-t border-gray-200">
+                            {/* NEW ORDER REQUEST ACTION BANNER */}
+                            {(ord.status === 'Order Requested' || ord.status === 'Pending Acceptance') && (
+                              <div className="p-3.5 bg-amber-50 border-l-4 border-amber-500 rounded text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                                 <div>
-                                  <strong className="text-charcoal block">{item.name}</strong>
-                                  <span className="text-gray-400">Qty: {item.qty || 1} • Price: ₹{(item.price || 0).toLocaleString('en-IN')}</span>
+                                  <strong className="font-bold text-amber-950 flex items-center gap-1.5 text-sm mb-0.5">
+                                    <AlertCircle size={16} className="text-amber-600 shrink-0" /> New Order Request — Seller Acceptance Required
+                                  </strong>
+                                  <span className="text-amber-800 text-[0.72rem] block">
+                                    Buyer <strong>{ord.buyerName || 'Customer'}</strong> has placed a new order request. Click <strong>"ACCEPT & CONFIRM ORDER"</strong> to accept this order and begin fulfillment (Amazon Seller Portal style).
+                                  </span>
                                 </div>
-                                <span className="font-semibold text-charcoal">₹{((item.price || 0) * (item.qty || 1)).toLocaleString('en-IN')}</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    onClick={() => handleUpdateOrderStatus(ord.id, 'Confirmed')}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                  >
+                                    <CheckCircle2 size={14} /> ACCEPT & CONFIRM ORDER
+                                  </button>
+                                  <button
+                                    onClick={() => handleUpdateOrderStatus(ord.id, 'Cancelled')}
+                                    className="bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 py-2 px-3.5 rounded text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                                  >
+                                    <XCircle size={14} /> DECLINE ORDER
+                                  </button>
+                                </div>
                               </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Customer Delivery Address */}
-                        {ord.address && (
-                          <div className="mb-4 p-3 bg-white/80 rounded border border-gray-200 text-xs">
-                            <span className="text-gray-500 font-semibold block uppercase tracking-wider mb-0.5 text-[0.68rem]">Shipping Address:</span>
-                            <span className="text-gray-700">{ord.address}</span>
-                          </div>
-                        )}
-
-                        {/* Return Request Details Callout */}
-                        {ord.status === 'Return Requested' && ord.returnDetails && (
-                          <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded text-xs text-purple-900">
-                            <div className="flex items-center justify-between font-bold mb-1">
-                              <span className="flex items-center gap-1 text-purple-800">
-                                <RotateCcw size={14} /> Customer Return Request Received
-                              </span>
-                              <span className="text-[0.68rem] text-purple-700">Date: {ord.returnDetails.requestDate || ord.date}</span>
-                            </div>
-                            <p className="mb-1"><strong>Reason:</strong> {ord.returnDetails.reason}</p>
-                            {ord.returnDetails.comments && (
-                              <p className="italic text-[0.7rem] text-gray-600 mb-1">"{ord.returnDetails.comments}"</p>
                             )}
-                            <p className="text-[0.68rem] text-purple-700"><strong>Refund Method Choice:</strong> {ord.returnDetails.refundMethod || 'Original Source'}</p>
-                          </div>
-                        )}
 
-                        {/* Refund Completed Callout */}
-                        {ord.status === 'Refunded' && ord.refundDetails && (
-                          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded text-xs text-emerald-900">
-                            <div className="font-bold flex items-center justify-between mb-1">
-                              <span className="flex items-center gap-1 text-emerald-800">
-                                <CheckCircle2 size={14} /> Refund Issued & Completed
-                              </span>
-                              <span className="font-mono text-[0.68rem]">Txn ID: {ord.refundDetails.refundTxnId}</span>
-                            </div>
-                            <p className="text-[0.68rem] text-emerald-700">
-                              Amount ₹{(ord.refundDetails.refundAmount || ord.totalAmount).toLocaleString('en-IN')} credited back on {ord.refundDetails.refundDate}.
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Cancelled Callout */}
-                        {ord.status === 'Cancelled' && (
-                          <div className="mb-4 p-2.5 bg-rose-50 border border-rose-200 rounded text-xs text-rose-900 flex items-center justify-between">
-                            <span className="flex items-center gap-1 font-medium">
-                              <XCircle size={14} className="text-rose-600" /> Order Cancelled: {ord.cancellationReason || 'Cancelled'}
-                            </span>
-                            <span className="text-[0.68rem] text-gray-500">{ord.cancelledAt || ord.date}</span>
-                          </div>
-                        )}
-
-                        {/* Actions Footer */}
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2 border-t border-gray-200">
-                          <div className="flex items-center gap-2 text-xs">
-                            <Truck size={16} className="text-gold-dark shrink-0" />
-                            <span className="text-gray-500">Tracking:</span>
-                            <strong className="font-mono text-charcoal">{ord.trackingNumber || ord.trackingCode || 'BLUEDART-EXP882'}</strong>
-                          </div>
-
-                          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-                            {/* Update Status Dropdown */}
-                            <div className="flex items-center gap-1 text-xs">
-                              <span className="text-gray-500 font-medium hidden sm:inline">Status:</span>
-                              <select
-                                value={ord.status || 'Confirmed'}
-                                onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value)}
-                                className="input-field text-xs py-1.5 px-2 font-semibold bg-white border border-gray-300"
-                              >
-                                <option value="Confirmed">Confirmed</option>
-                                <option value="Shipped">Shipped (In Transit)</option>
-                                <option value="Delivered">Delivered</option>
-                                <option value="Return Requested">Return Requested</option>
-                                <option value="Refunded">Refunded</option>
-                                <option value="Cancelled">Cancelled</option>
-                              </select>
+                            {/* Customer Email & Full Details Banner */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs bg-white p-2.5 rounded border border-gray-200">
+                              <div>
+                                <span className="text-gray-500 font-medium">Customer Email: </span>
+                                <strong className="text-charcoal font-mono">{ord.buyerEmail || 'priya.m@gmail.com'}</strong>
+                              </div>
+                              <div className="text-gray-500">
+                                <span>Order Date: <strong>{ord.date}</strong></span>
+                              </div>
                             </div>
 
-                            {/* View Tax Invoice Action */}
-                            <button
-                              onClick={() => setSelectedInvoiceOrder(ord)}
-                              className="py-1.5 px-3 text-xs font-semibold rounded border bg-gold/10 text-gold-dark border-gold/40 hover:bg-gold/20 flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
-                              title="View / Print Tax Invoice"
-                            >
-                              <FileText size={13} /> View Invoice
-                            </button>
+                            {/* Items Purchased */}
+                            {ord.items && ord.items.length > 0 && (
+                              <div>
+                                <span className="text-[0.68rem] text-gray-500 font-semibold uppercase tracking-wider block mb-1.5">
+                                  Purchased Items ({ord.items.length}):
+                                </span>
+                                <div className="space-y-2">
+                                  {ord.items.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-xs bg-white p-2.5 rounded border border-gray-200">
+                                      <div>
+                                        <strong className="text-charcoal block">{item.name}</strong>
+                                        <span className="text-gray-500">Qty: {item.qty || 1} • Unit Price: ₹{(item.price || 0).toLocaleString('en-IN')}</span>
+                                      </div>
+                                      <span className="font-semibold text-charcoal">₹{((item.price || 0) * (item.qty || 1)).toLocaleString('en-IN')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
 
-                            {/* Delete Order Action */}
-                            <button
-                              onClick={() => handleDeleteSellerOrder(ord.id)}
-                              className="py-1.5 px-2.5 text-xs text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 rounded border border-red-200 flex items-center gap-1 cursor-pointer font-medium"
-                              title="Delete Order Record"
-                            >
-                              <Trash2 size={13} /> Delete Record
-                            </button>
+                            {/* Customer Delivery Address */}
+                            {ord.address && (
+                              <div className="p-3 bg-white rounded border border-gray-200 text-xs">
+                                <span className="text-gray-500 font-semibold block uppercase tracking-wider mb-0.5 text-[0.68rem]">Shipping & Delivery Address:</span>
+                                <span className="text-gray-800">{ord.address}</span>
+                              </div>
+                            )}
+
+                            {/* Return Request Details Callout */}
+                            {ord.status === 'Return Requested' && ord.returnDetails && (
+                              <div className="p-3 bg-purple-50 border border-purple-200 rounded text-xs text-purple-900">
+                                <div className="flex items-center justify-between font-bold mb-1">
+                                  <span className="flex items-center gap-1 text-purple-800">
+                                    <RotateCcw size={14} /> Customer Return Request Received
+                                  </span>
+                                  <span className="text-[0.68rem] text-purple-700">Date: {ord.returnDetails.requestDate || ord.date}</span>
+                                </div>
+                                <p className="mb-1"><strong>Reason:</strong> {ord.returnDetails.reason}</p>
+                                {ord.returnDetails.comments && (
+                                  <p className="italic text-[0.7rem] text-gray-600 mb-1">"{ord.returnDetails.comments}"</p>
+                                )}
+                                <p className="text-[0.68rem] text-purple-700"><strong>Refund Method Choice:</strong> {ord.returnDetails.refundMethod || 'Original Source'}</p>
+                              </div>
+                            )}
+
+                            {/* Refund Completed Callout */}
+                            {ord.status === 'Refunded' && ord.refundDetails && (
+                              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded text-xs text-emerald-900">
+                                <div className="font-bold flex items-center justify-between mb-1">
+                                  <span className="flex items-center gap-1 text-emerald-800">
+                                    <CheckCircle2 size={14} /> Refund Issued & Completed
+                                  </span>
+                                  <span className="font-mono text-[0.68rem]">Txn ID: {ord.refundDetails.refundTxnId}</span>
+                                </div>
+                                <p className="text-[0.68rem] text-emerald-700">
+                                  Amount ₹{(ord.refundDetails.refundAmount || ord.totalAmount).toLocaleString('en-IN')} credited back on {ord.refundDetails.refundDate}.
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Cancelled Callout */}
+                            {ord.status === 'Cancelled' && (
+                              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded text-xs text-rose-900 flex items-center justify-between">
+                                <span className="flex items-center gap-1 font-medium">
+                                  <XCircle size={14} className="text-rose-600" /> Order Cancelled: {ord.cancellationReason || 'Cancelled'}
+                                </span>
+                                <span className="text-[0.68rem] text-gray-500">{ord.cancelledAt || ord.date}</span>
+                              </div>
+                            )}
+
+                            {/* Actions Footer */}
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-3 border-t border-gray-200">
+                              <div className="flex items-center gap-2 text-xs">
+                                <Truck size={16} className="text-gold-dark shrink-0" />
+                                <span className="text-gray-500">Tracking:</span>
+                                <strong className="font-mono text-charcoal">{ord.trackingNumber || ord.trackingCode || 'BLUEDART-EXP882'}</strong>
+                              </div>
+
+                              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                                {/* Update Status Dropdown */}
+                                <div className="flex items-center gap-1 text-xs">
+                                  <span className="text-gray-500 font-medium hidden sm:inline">Status:</span>
+                                  <select
+                                    value={ord.status || 'Confirmed'}
+                                    onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value)}
+                                    className="input-field text-xs py-1.5 px-2 font-semibold bg-white border border-gray-300 rounded"
+                                  >
+                                    <option value="Confirmed">Confirmed</option>
+                                    <option value="Shipped">Shipped (In Transit)</option>
+                                    <option value="Delivered">Delivered</option>
+                                    <option value="Return Requested">Return Requested</option>
+                                    <option value="Refunded">Refunded</option>
+                                    <option value="Cancelled">Cancelled</option>
+                                  </select>
+                                </div>
+
+                                {/* View Tax Invoice Action */}
+                                <button
+                                  onClick={() => setSelectedInvoiceOrder(ord)}
+                                  className="py-1.5 px-3 text-xs font-semibold rounded border bg-gold/10 text-gold-dark border-gold/40 hover:bg-gold/20 flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
+                                  title="View / Print Tax Invoice"
+                                >
+                                  <FileText size={13} /> View Invoice
+                                </button>
+
+                                {/* Delete Order Action */}
+                                <button
+                                  onClick={() => handleDeleteSellerOrder(ord.id)}
+                                  className="py-1.5 px-2.5 text-xs text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 rounded border border-red-200 flex items-center gap-1 cursor-pointer font-medium"
+                                  title="Delete Order Record"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     ))}
                   </div>

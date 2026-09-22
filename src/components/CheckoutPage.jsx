@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Lock, CheckCircle2, ArrowRight, CreditCard, Smartphone, Building, Wallet, Truck, Loader2, MapPin } from 'lucide-react';
 import { api } from '../services/api';
+import { MOCK_ORDERS } from '../data/marketplaceData';
 
 export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop, currentUser }) {
   const [step, setStep] = useState('checkout'); // 'checkout' or 'success'
@@ -134,24 +135,32 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop, current
           handler: async function (response) {
             await api.verifyRazorpayPayment(response);
 
+            const generatedId = `RAT-ORD-${Math.floor(10000 + Math.random() * 90000)}`;
             const orderPayload = {
+              id: generatedId,
+              date: new Date().toISOString().split('T')[0],
+              createdAt: new Date().toISOString(),
               buyerName: formData.fullName,
               buyerEmail: formData.email,
               buyerPhone: formData.phone,
               address: `${formData.address}, ${formData.city}, ${formData.state} - ${formData.pincode}`,
               totalAmount: total,
               paymentMethod: formData.paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : 'Prepaid (UPI / Card)',
-              sellerName: cartItems[0]?.sellerName || 'Verified Jeweller',
+              sellerName: cartItems[0]?.sellerName || 'Kundan Jewels Jaipur',
               sellerId: cartItems[0]?.sellerId || 'seller-1',
+              status: 'Order Requested',
               items: cartItems.map(i => ({
                 productId: i.id,
                 name: i.name,
                 price: i.price,
                 qty: i.quantity || 1,
-                sellerName: i.sellerName || 'Verified Jeweller',
-                sellerId: i.sellerId || 'seller-1'
+                sellerName: i.sellerName || cartItems[0]?.sellerName || 'Kundan Jewels Jaipur',
+                sellerId: i.sellerId || cartItems[0]?.sellerId || 'seller-1'
               }))
             };
+
+            // Unshift into MOCK_ORDERS so instant UI update happens
+            MOCK_ORDERS.unshift(orderPayload);
 
             // Save Order to Backend DB & Send Nodemailer Email
             try {
@@ -204,24 +213,32 @@ export function CheckoutPage({ cartItems, onOrderPlaced, onNavigateShop, current
         rzp.open();
       } else {
         setTimeout(async () => {
+          const generatedId = `RAT-ORD-${Math.floor(10000 + Math.random() * 90000)}`;
           const orderPayload = {
+            id: generatedId,
+            date: new Date().toISOString().split('T')[0],
+            createdAt: new Date().toISOString(),
             buyerName: formData.fullName,
             buyerEmail: formData.email,
             buyerPhone: formData.phone,
             address: `${formData.address}, ${formData.city}, ${formData.state} - ${formData.pincode}`,
             totalAmount: total,
             paymentMethod: formData.paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : 'Prepaid (UPI / Card)',
-            sellerName: cartItems[0]?.sellerName || 'Verified Jeweller',
+            sellerName: cartItems[0]?.sellerName || 'Kundan Jewels Jaipur',
             sellerId: cartItems[0]?.sellerId || 'seller-1',
+            status: 'Order Requested',
             items: cartItems.map(i => ({
               productId: i.id,
               name: i.name,
               price: i.price,
               qty: i.quantity || 1,
-              sellerName: i.sellerName || 'Verified Jeweller',
-              sellerId: i.sellerId || 'seller-1'
+              sellerName: i.sellerName || cartItems[0]?.sellerName || 'Kundan Jewels Jaipur',
+              sellerId: i.sellerId || cartItems[0]?.sellerId || 'seller-1'
             }))
           };
+
+          // Unshift into MOCK_ORDERS so instant UI update happens
+          MOCK_ORDERS.unshift(orderPayload);
 
           // Save Order to Backend DB & Send Nodemailer Email
           try {

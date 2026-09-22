@@ -14,6 +14,7 @@ import {
   RotateCcw,
   BadgeCheck
 } from 'lucide-react';
+import { DETAILED_FAQS } from '../data/faqData';
 
 export function PolicyPages({ initialTab = 'shipping', onNavigateShop, onNavigateContact }) {
   const [activePolicy, setActivePolicy] = useState(initialTab);
@@ -23,39 +24,7 @@ export function PolicyPages({ initialTab = 'shipping', onNavigateShop, onNavigat
     setOpenFaqIndex(openFaqIndex === index ? null : index);
   };
 
-  const faqs = [
-    {
-      q: 'How do I verify the 100% BIS Hallmark on gold jewellery bought from Ratnaya?',
-      a: 'Every gold jewellery piece listed on Ratnaya carries mandatory Bureau of Indian Standards (BIS) 6-digit HUID (Hallmark Unique Identification) laser engraving. You can verify the authenticity, gold purity (22K 916 / 18K 750), and hallmarking center details instantly using the official BIS Care Mobile App by entering the engraved HUID code.'
-    },
-    {
-      q: 'Are the solitaires and gemstone creations certified by GIA, IGI, or SGL?',
-      a: 'Yes! All natural diamond solitaires, precious emeralds, Burmese rubies, and polki heirlooms come with physical authenticity certificates from accredited international laboratories including GIA (Gemological Institute of America), IGI (International Gemological Institute), or SGL (Solitaire Gemological Laboratories).'
-    },
-    {
-      q: 'What happens if my shipment package is damaged or tampered with in transit?',
-      a: 'All Ratnaya dispatches travel in double-walled, tamper-evident security bags secured with unique serialized seals. In the rare event that the outer seal appears broken or compromised, do not share the delivery OTP with the courier executive. Contact Ratnaya Urgent Support (+91 98200 00000) immediately for hassle-free replacement under our 100% Transit Insurance.'
-    },
-    {
-      q: 'Can I request custom ring sizes, bangle sizes, or necklace chain lengths?',
-      a: 'Absolutely! During checkout or by contacting patron support within 12 hours of placing an order, you can specify exact ring sizes (US 4 to 12 / Indian 6 to 30), bangle diameters (2.2, 2.4, 2.6, 2.8), or custom chain extensions. Our master artisans adjust sizing before final hallmarking.'
-    },
-    {
-      q: 'How does the 14-Day Easy Return and Lifetime Buyback Guarantee work?',
-      a: 'Ratnaya offers a 14-Day No-Questions-Asked Return Policy for standard items returned in unworn condition with original security tags and certificates intact. Furthermore, all gold and diamond jewellery purchases qualify for Lifetime Exchange & Buyback at prevailing gold market rates across our verified jeweller network.'
-    },
-    {
-      q: 'Is paying high amounts online via UPI (Google Pay), Cards, or Net Banking safe?',
-      a: 'Yes, 100% secure. Payments on Ratnaya are processed through RBI-regulated Razorpay payment gateways using 256-Bit SSL military-grade encryption and 3D Secure OTP verification. Funds are held in RBI-compliant escrow until your delivery is successfully verified.'
-    },
-    {
-      q: 'How are real-time gold rates and making charges calculated?',
-      a: 'Prices on Ratnaya transparently break down the Gold Weight, Gold Purity Rate (22K/18K prevailing market rate), Gemstone Weight, and Making Charges (artisan wirework/Kundan crafting fee) + 3% GST. Once your order is placed, your purchase price is locked and protected against any gold market spikes.'
-    },    {
-      q: 'How can independent heritage jewellers and artisans list their collections on Ratnaya?',
-      a: 'Verified jeweller merchants can register via our Seller Portal by submitting GSTIN, PAN, and BIS Hallmarking License credentials. Once audited by our Compliance Officers, merchants receive dedicated seller dashboards to list inventory and track automated bank payouts.'
-    }
-  ];
+  const faqs = DETAILED_FAQS;
 
   return (
     <div style={{ backgroundColor: '#FAF6F0', minHeight: '90vh', padding: '60px 0 100px' }}>
@@ -435,7 +404,8 @@ export function PolicyPages({ initialTab = 'shipping', onNavigateShop, onNavigat
                           color: '#555',
                           lineHeight: 1.7,
                           borderTop: '1px solid rgba(197, 160, 89, 0.15)',
-                          paddingTop: '16px'
+                          paddingTop: '16px',
+                          whiteSpace: 'pre-line'
                         }}
                       >
                         {faq.a}
