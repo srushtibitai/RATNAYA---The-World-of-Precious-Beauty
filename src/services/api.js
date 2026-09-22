@@ -4,9 +4,13 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://ratnaya-backe
 // const API_BASE_URL = 'http://localhost:5050/api';
 
 export function getImageUrl(imagePath) {
-  if (!imagePath) return '';
+  if (!imagePath) return '/assets/jewellery/necklace/1.jpg';
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://') || imagePath.startsWith('data:')) {
     return imagePath;
+  }
+  // Frontend static assets (/assets/...) are served directly by Vite frontend server
+  if (imagePath.startsWith('/assets/') || imagePath.startsWith('assets/')) {
+    return imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
   }
   const backendBase = API_BASE_URL.replace(/\/api\/?$/, '');
   const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;

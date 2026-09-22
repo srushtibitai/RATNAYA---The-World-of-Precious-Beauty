@@ -67,11 +67,81 @@ export default function App() {
       const res = await api.getProducts();
       if (res.success && res.data.length > 0) {
         setProducts(res.data);
-        setSelectedProduct(res.data[0]);
       }
     }
     loadBackendData();
   }, []);
+
+  // Handle Hash URL Routing (#product/:id, #shop?sellerId=..., etc.)
+  useEffect(() => {
+    async function handleHashRoute() {
+      const hash = window.location.hash || '';
+      if (!hash) return;
+
+      // 1. Direct Product Link: #product/:id
+      if (hash.startsWith('#product/')) {
+        const targetId = decodeURIComponent(hash.replace('#product/', '')).trim();
+        if (targetId) {
+          // A. Search in already loaded products state
+          let match = (products || []).find((p) => String(p.id) === String(targetId) || String(p._id) === String(targetId) || String(p.sku) === String(targetId));
+
+          // B. If not found in memory, fetch directly from backend API endpoint /api/products/:id
+          if (!match) {
+            try {
+              const res = await api.getProductById(targetId);
+              if (res && res.success && res.data) {
+                match = res.data;
+              }
+            } catch (err) {
+              console.warn('Backend product fetch notice:', err);
+            }
+          }
+
+          // C. Fallback to INITIAL_PRODUCTS
+          if (!match) {
+            match = INITIAL_PRODUCTS.find((p) => String(p.id) === String(targetId) || String(p._id) === String(targetId) || String(p.sku) === String(targetId));
+          }
+
+          if (match) {
+            setSelectedProduct(match);
+            setActiveTab('product-detail');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }
+      }
+      // 2. Seller Storefront Link: #shop?sellerId=... or #seller/:sellerId or #store/:sellerId
+      else if (hash.includes('sellerId=') || hash.startsWith('#seller/') || hash.startsWith('#store/')) {
+        let sellerId = 'seller-1';
+        if (hash.includes('sellerId=')) {
+          sellerId = hash.split('sellerId=')[1]?.split('&')[0];
+        } else if (hash.startsWith('#seller/')) {
+          sellerId = hash.replace('#seller/', '');
+        } else if (hash.startsWith('#store/')) {
+          sellerId = hash.replace('#store/', '');
+        }
+        if (sellerId) {
+          setSelectedSellerId(sellerId);
+          setActiveTab('seller-store');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
+      // 3. Direct Tab Hashes (#shop, #cart, #checkout, #collections, #about, #faq, etc.)
+      else if (hash.startsWith('#')) {
+        const tabName = hash.replace('#', '').trim();
+        if (['home', 'shop', 'collections', 'about', 'contact', 'faq', 'checkout', 'seller-dashboard', 'admin-dashboard'].includes(tabName)) {
+          setActiveTab(tabName);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
+    }
+
+    handleHashRoute();
+
+    window.addEventListener('hashchange', handleHashRoute);
+    return () => {
+      window.removeEventListener('hashchange', handleHashRoute);
+    };
+  }, [products]);
 
   // Interactive Drawer & Modal states
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -266,6 +336,9 @@ export default function App() {
   const handleSelectProduct = (product) => {
     setSelectedProduct(product);
     setActiveTab('product-detail');
+    if (product && (product.id || product._id)) {
+      window.location.hash = `product/${product.id || product._id}`;
+    }
   };
 
   const handleSelectCategory = (categoryId) => {

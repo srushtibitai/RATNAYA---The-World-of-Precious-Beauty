@@ -36,10 +36,12 @@ import {
   Filter,
   ChevronDown,
   ChevronUp,
-  Eye
+  Eye,
+  Share2
 } from 'lucide-react';
 import InvoiceModal from './InvoiceModal';
 import FinancialReportsView from './FinancialReportsView';
+import { ShareCatalogModal } from './ShareCatalogModal';
 
 export function SellerDashboardPage({ currentUser, sellerId }) {
   const sellerFromData = SELLERS.find((s) => s.id === sellerId || s.id === currentUser?.id || s.id === currentUser?.sellerId);
@@ -91,6 +93,15 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
   // Invoice modal & search state
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('');
+
+  // Social Catalog Share Modal state
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [selectedShareProduct, setSelectedShareProduct] = useState(null);
+
+  const handleOpenShareCatalog = (prod = null) => {
+    setSelectedShareProduct(prod);
+    setIsShareModalOpen(true);
+  };
 
   // Seller Profile State
   const [sellerProfile, setSellerProfile] = useState({
@@ -613,7 +624,14 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                onClick={() => handleOpenShareCatalog(null)}
+                className="bg-gold hover:bg-gold-dark text-charcoal hover:text-white px-3 py-1 rounded text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all cursor-pointer hover:scale-[1.02]"
+                title="Share digital store catalog on WhatsApp, Instagram, Facebook, etc."
+              >
+                <Share2 size={13} /> Share Catalog 📲
+              </button>
               <span className="badge-gold text-xs">GST: {sellerProfile.gst || 'Not Submitted'}</span>
               {sellerProfile.status === 'Approved' ? (
                 <span className="bg-emerald-600 text-white text-xs px-2.5 py-1 rounded font-semibold flex items-center gap-1 shadow-xs">
@@ -829,11 +847,23 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
             {/* MY PRODUCTS TAB */}
             {activeTab === 'products' && (
               <div className="bg-white p-6 border border-gray-200 rounded-sm shadow-sm">
-                <div className="flex items-center justify-between gap-4 mb-6">
-                  <h3 className="font-heading text-xl">Managed Products</h3>
-                  <button onClick={() => setActiveTab('add-product')} className="btn-gold py-2 px-4 text-xs">
-                    <PlusCircle size={15} /> Add New Piece
-                  </button>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                  <div>
+                    <h3 className="font-heading text-xl">Managed Products Catalog</h3>
+                    <p className="text-xs text-gray-500">View your active inventory or share your full catalog link on social media.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleOpenShareCatalog(null)}
+                      className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs px-3.5 py-2 rounded font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      title="Share full catalog on WhatsApp, Instagram, Facebook"
+                    >
+                      <Share2 size={14} /> Share Full Catalog 📲
+                    </button>
+                    <button onClick={() => setActiveTab('add-product')} className="btn-gold py-2 px-4 text-xs">
+                      <PlusCircle size={15} /> Add New Piece
+                    </button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                   {sellerProductsList.map((p) => (
@@ -862,13 +892,22 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
                           <span className={`badge-status text-xs ${p.approvalStatus === 'Approved' ? 'badge-approved' : p.approvalStatus === 'Rejected' ? 'bg-rose-100 text-rose-800 border border-rose-200 font-bold' : 'badge-pending'}`}>
                             {p.approvalStatus || 'Approved'}
                           </span>
-                          <button
-                            onClick={() => handleEditClick(p)}
-                            className="p-1 text-xs text-gray-500 hover:text-gold-dark flex items-center gap-1 font-medium"
-                            title="Edit Product & Resubmit"
-                          >
-                            <Edit size={14} /> Edit & Resubmit
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => handleOpenShareCatalog(p)}
+                              className="px-2 py-0.5 text-[0.72rem] text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 flex items-center gap-1 font-semibold transition-colors cursor-pointer"
+                              title="Share this product on WhatsApp / Social Media"
+                            >
+                              <Share2 size={12} /> Share 🔗
+                            </button>
+                            <button
+                              onClick={() => handleEditClick(p)}
+                              className="p-1 text-xs text-gray-500 hover:text-gold-dark flex items-center gap-1 font-medium"
+                              title="Edit Product & Resubmit"
+                            >
+                              <Edit size={14} /> Edit
+                            </button>
+                          </div>
                         </div>
                         <h4 className="text-sm font-medium text-charcoal mt-2 mb-1 line-clamp-1">{p.name}</h4>
                         <div className="font-semibold text-sm">₹{p.price ? Number(p.price).toLocaleString('en-IN') : '0'}</div>
@@ -2566,6 +2605,15 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
         onClose={() => setSelectedInvoiceOrder(null)}
         sellerDetails={sellerProfile}
         globalGstRate={3}
+      />
+
+      {/* Social Catalog Share Modal */}
+      <ShareCatalogModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        seller={sellerProfile}
+        product={selectedShareProduct}
+        totalProducts={sellerProductsList.length}
       />
     </div>
   );
