@@ -6,7 +6,7 @@ const VIDEO_CATEGORIES = [
     title: 'Earrings',
     itemCount: '80+ items',
     video: '/assets/jewellery/video/From Klickpin.com- Money Saving Tips Inspiration for Everyday 18207-pin-id-982136631248328968.mp4',
-    poster: '/assets/jewellery/earring/1.jpg',
+    poster: '/assets/jewellery/earrings/1.jpg',
     description: 'Handcrafted Kundan droplets and diamond chandelier earrings tailored for royal moments.'
   },
   {

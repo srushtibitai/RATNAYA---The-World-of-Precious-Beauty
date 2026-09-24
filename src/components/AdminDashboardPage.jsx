@@ -39,9 +39,12 @@ import {
   FileText,
   Download,
   Table,
-  PieChart
+  PieChart,
+  Megaphone,
+  Sparkles,
+  Tag
 } from 'lucide-react';
-import { api, openDocument, formatDocName, formatDocSize } from '../services/api';
+import { api, openDocument, formatDocName, formatDocSize, getImageUrl } from '../services/api';
 import InvoiceModal from './InvoiceModal';
 import FinancialReportsView from './FinancialReportsView';
 
@@ -80,6 +83,81 @@ export function AdminDashboardPage() {
 
   const [globalCommission, setGlobalCommission] = useState(10); // 10% default marketplace commission
   const [globalGstRate, setGlobalGstRate] = useState(3); // 3% default jewellery GST rate
+
+  // Admin Seller Banner Ads Approval State
+  const [allSellerAds, setAllSellerAds] = useState([]);
+  const [loadingAdminAds, setLoadingAdminAds] = useState(false);
+  const [adminAdStatusFilter, setAdminAdStatusFilter] = useState('all');
+  const [rejectAdModal, setRejectAdModal] = useState({
+    isOpen: false,
+    ad: null,
+    reason: ''
+  });
+
+  const syncAdminSellerAds = async () => {
+    try {
+      setLoadingAdminAds(true);
+      const res = await api.getAllSellerAdsAdmin('all');
+      if (res && res.success && Array.isArray(res.data)) {
+        setAllSellerAds(res.data);
+      }
+    } catch (err) {
+      console.warn('Sync admin seller ads error:', err);
+    } finally {
+      setLoadingAdminAds(false);
+    }
+  };
+
+  const handleApproveAd = async (adId) => {
+    try {
+      const res = await api.approveSellerAd(adId);
+      if (res && res.success) {
+        alert('🟢 Seller Banner Ad Approved successfully! It is now Live on Homepage.');
+        syncAdminSellerAds();
+      } else {
+        alert(res?.message || 'Failed to approve banner ad.');
+      }
+    } catch (err) {
+      alert('Error approving banner ad: ' + err.message);
+    }
+  };
+
+  const handleOpenRejectAdModal = (ad) => {
+    setRejectAdModal({
+      isOpen: true,
+      ad,
+      reason: 'Banner image resolution or text content does not meet marketplace guidelines.'
+    });
+  };
+
+  const handleConfirmRejectAd = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!rejectAdModal.ad) return;
+
+    try {
+      const adId = rejectAdModal.ad._id || rejectAdModal.ad.id;
+      const res = await api.rejectSellerAd(adId, rejectAdModal.reason);
+      if (res && res.success) {
+        alert('🔴 Seller Banner Ad Rejected.');
+        setRejectAdModal({ isOpen: false, ad: null, reason: '' });
+        syncAdminSellerAds();
+      } else {
+        alert(res?.message || 'Failed to reject banner ad.');
+      }
+    } catch (err) {
+      alert('Error rejecting banner ad: ' + err.message);
+    }
+  };
+
+  const handleDeleteAdAdmin = async (adId) => {
+    if (!window.confirm('Permanently delete this seller ad banner record from database?')) return;
+    try {
+      await api.deleteSellerAd(adId);
+      syncAdminSellerAds();
+    } catch (err) {
+      alert('Failed to delete seller ad banner.');
+    }
+  };
 
   // Save Commission to Database API
   const handleSaveCommission = async () => {
@@ -218,6 +296,7 @@ export function AdminDashboardPage() {
     syncBackendPendingProducts();
     syncAdminOrders();
     syncAdminSettings();
+    syncAdminSellerAds();
   }, [activeTab]);
 
   // Handle Approve Return & Issue Refund by Admin
@@ -1248,6 +1327,7 @@ export function AdminDashboardPage() {
                 { id: 'sellers', label: `Verified Jewellers (${sellersList.length})`, icon: <Users size={18} /> },
                 { id: 'commission', label: 'Commissions & Rates', icon: <Percent size={18} /> },
                 { id: 'seller-approvals', label: `Seller Approvals (${pendingSellers.length})`, icon: <Store size={18} /> },
+                { id: 'seller-banner-ads', label: `Seller Ads Approval (${allSellerAds.filter((a) => a.status === 'pending').length})`, icon: <Megaphone size={18} /> },
                 { id: 'product-approvals', label: `Product Approvals (${pendingProducts.length})`, icon: <Package size={18} /> },
                 { id: 'returns', label: `Returns & Refunds (${adminOrders.filter((o) => o.status === 'Return Requested').length})`, icon: <RotateCcw size={18} /> },
                 { id: 'orders', label: 'All Orders & Logistics', icon: <ShoppingBag size={18} /> }
@@ -1664,6 +1744,219 @@ export function AdminDashboardPage() {
                 )}
               </div>
             )}
+
+            {/* SELLER BANNER ADS APPROVAL TAB */}
+            {activeTab === 'seller-banner-ads' && (
+              <div className="bg-white p-6 sm:p-8 border border-gray-200 rounded-sm shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-gold-dark px-2.5 py-0.5 rounded bg-gold-light/20">
+                      MODERATION & APPROVALS
+                    </span>
+                    <h3 className="font-heading text-2xl text-charcoal mt-1">
+                      Seller Promotional Banner Ads Approval ({allSellerAds.length})
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Review seller ad banners, size dimensions, target link, and approve or reject before appearing live on Home Page.
+                    </p>
+                  </div>
+                  <button onClick={syncAdminSellerAds} className="btn-outline py-1.5 px-3 text-xs flex items-center gap-1.5">
+                    <RotateCcw size={14} /> Refresh Banners
+                  </button>
+                </div>
+
+                {/* Stat Cards Header */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="p-4 rounded border border-amber-200 bg-amber-50/50">
+                    <span className="text-xs text-amber-800 font-medium uppercase block">Pending Review</span>
+                    <span className="text-2xl font-bold text-amber-900 mt-1 block">
+                      {allSellerAds.filter((a) => a.status === 'pending').length} Banners
+                    </span>
+                    <span className="text-[10px] text-amber-700 mt-0.5 block">Awaiting Admin Approval</span>
+                  </div>
+
+                  <div className="p-4 rounded border border-emerald-200 bg-emerald-50/50">
+                    <span className="text-xs text-emerald-800 font-medium uppercase block">Live Active Banners</span>
+                    <span className="text-2xl font-bold text-emerald-900 mt-1 block">
+                      {allSellerAds.filter((a) => a.status === 'active').length} Banners
+                    </span>
+                    <span className="text-[10px] text-emerald-700 mt-0.5 block">Live on Homepage Rotations</span>
+                  </div>
+
+                  <div className="p-4 rounded border border-rose-200 bg-rose-50/50">
+                    <span className="text-xs text-rose-800 font-medium uppercase block">Rejected Banners</span>
+                    <span className="text-2xl font-bold text-rose-900 mt-1 block">
+                      {allSellerAds.filter((a) => a.status === 'rejected').length} Banners
+                    </span>
+                    <span className="text-[10px] text-rose-700 mt-0.5 block">Not Meeting Guidelines</span>
+                  </div>
+
+                  <div className="p-4 rounded border border-gold-light/40 bg-[#FAF6F0]">
+                    <span className="text-xs text-gold-dark font-medium uppercase block">Ad Revenues Earned</span>
+                    <span className="text-2xl font-bold text-gray-900 mt-1 block">
+                      ₹{allSellerAds.reduce((sum, a) => sum + (Number(a.pricePaid) || 0), 0).toLocaleString('en-IN')}
+                    </span>
+                    <span className="text-[10px] text-gray-500 mt-0.5 block">Paid by Seller Merchants</span>
+                  </div>
+                </div>
+
+                {/* Filter Tabs */}
+                <div className="flex items-center gap-2 border-b border-gray-200 pb-3 overflow-x-auto">
+                  {[
+                    { key: 'all', label: `All Ads (${allSellerAds.length})` },
+                    { key: 'pending', label: `Pending Approval (${allSellerAds.filter((a) => a.status === 'pending').length})` },
+                    { key: 'active', label: `Live Active (${allSellerAds.filter((a) => a.status === 'active').length})` },
+                    { key: 'rejected', label: `Rejected (${allSellerAds.filter((a) => a.status === 'rejected').length})` }
+                  ].map((fTab) => (
+                    <button
+                      key={fTab.key}
+                      onClick={() => setAdminAdStatusFilter(fTab.key)}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                        adminAdStatusFilter === fTab.key
+                          ? 'bg-gold-dark text-white shadow-sm'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {fTab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Banners List */}
+                {loadingAdminAds ? (
+                  <div className="py-12 text-center text-xs text-gray-500">Loading seller ads...</div>
+                ) : allSellerAds.filter((a) => adminAdStatusFilter === 'all' || a.status === adminAdStatusFilter).length === 0 ? (
+                  <div className="p-12 text-center bg-[#FAF6F0] rounded border border-gray-200 text-gray-500 text-xs">
+                    No banner ads found under "{adminAdStatusFilter}" status filter.
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-6">
+                    {allSellerAds
+                      .filter((a) => adminAdStatusFilter === 'all' || a.status === adminAdStatusFilter)
+                      .map((ad) => {
+                        const isPending = ad.status === 'pending';
+                        const isActive = ad.status === 'active';
+                        const isRejected = ad.status === 'rejected';
+
+                        return (
+                          <div
+                            key={ad._id || ad.id}
+                            className={`p-6 rounded border transition-all ${
+                              isPending
+                                ? 'border-amber-300 bg-amber-50/20 shadow-sm'
+                                : isActive
+                                ? 'border-emerald-200 bg-white'
+                                : 'border-gray-200 bg-gray-50/50'
+                            }`}
+                          >
+                            <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_auto] gap-6 items-center">
+                              {/* Banner Preview Image */}
+                              <div className="relative group aspect-[16/9] rounded-lg overflow-hidden border border-gray-300 bg-gray-100 shrink-0">
+                                <img
+                                  src={getImageUrl(ad.image || ad.mainImage)}
+                                  alt={ad.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                />
+                                <div className="absolute top-2 left-2">
+                                  <span className="px-2 py-0.5 text-[9px] font-bold rounded bg-black/80 text-white uppercase tracking-wider">
+                                    📐 {ad.bannerSize || '1920x600'} px
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Details */}
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gold-light/20 text-gold-dark uppercase tracking-wider">
+                                    {ad.adType === 'top_banner' ? '🏆 Top Hero Banner' : '✨ Royal Section Banner'}
+                                  </span>
+                                  <span className="text-[10px] font-semibold text-gray-500">
+                                    Merchant: <strong className="text-gray-900">{ad.sellerShopName || ad.sellerName}</strong> ({ad.sellerName})
+                                  </span>
+                                  <span className="text-[10px] text-gray-400">
+                                    • Paid: ₹{ad.pricePaid || (ad.durationDays === 1 ? 299 : ad.durationDays === 30 ? 4999 : 1499)} ({ad.durationDays} Days Plan)
+                                  </span>
+                                </div>
+
+                                <h4 className="font-heading text-lg text-gray-900 font-bold">{ad.title}</h4>
+                                <p className="text-xs text-gray-600 line-clamp-2">{ad.description}</p>
+
+                                <div className="flex items-center gap-4 text-[11px] text-gray-500 pt-1">
+                                  <span>
+                                    Category Target: <strong className="capitalize text-gray-800">{ad.targetCategory || 'necklaces'}</strong>
+                                  </span>
+                                  <span>
+                                    Requested Size: <strong className="text-gold-dark font-medium">{ad.bannerSizeLabel || (ad.bannerSize + ' px')}</strong>
+                                  </span>
+                                </div>
+
+                                {isRejected && ad.rejectionReason && (
+                                  <div className="p-2 rounded bg-rose-50 border border-rose-200 text-xs text-rose-800 mt-2 font-medium">
+                                    Rejection Reason: {ad.rejectionReason}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex flex-col gap-2 shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 pt-4 lg:pt-0 lg:pl-6">
+                                {isPending ? (
+                                  <>
+                                    <button
+                                      onClick={() => handleApproveAd(ad._id || ad.id)}
+                                      className="btn-gold py-2.5 px-6 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                                    >
+                                      <CheckCircle2 size={16} /> APPROVE & PUBLISH LIVE
+                                    </button>
+                                    <button
+                                      onClick={() => handleOpenRejectAdModal(ad)}
+                                      className="btn-outline py-2 px-6 text-xs text-rose-600 border-rose-200 hover:bg-rose-50 font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                      <XCircle size={16} /> REJECT BANNER
+                                    </button>
+                                  </>
+                                ) : isActive ? (
+                                  <div className="space-y-2">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 w-full justify-center">
+                                      <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                                      LIVE ON HOMEPAGE
+                                    </span>
+                                    <button
+                                      onClick={() => handleOpenRejectAdModal(ad)}
+                                      className="btn-outline py-1.5 px-4 text-[11px] text-rose-600 border-rose-200 hover:bg-rose-50 w-full cursor-pointer"
+                                    >
+                                      Revoke / Reject
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-900 border border-rose-300 w-full justify-center">
+                                      REJECTED
+                                    </span>
+                                    <button
+                                      onClick={() => handleApproveAd(ad._id || ad.id)}
+                                      className="btn-gold py-1.5 px-4 text-[11px] w-full cursor-pointer"
+                                    >
+                                      Re-Approve & Publish
+                                    </button>
+                                  </div>
+                                )}
+
+                                <button
+                                  onClick={() => handleDeleteAdAdmin(ad._id || ad.id)}
+                                  className="text-[11px] text-gray-400 hover:text-rose-600 underline text-center mt-1 cursor-pointer"
+                                >
+                                  Delete Record
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
+
 
             {/* PRODUCT APPROVALS TAB */}
             {activeTab === 'product-approvals' && (
@@ -2714,7 +3007,61 @@ export function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Tax Invoice Printable Modal */}
+      {/* BANNER AD REJECTION REASON MODAL */}
+      {rejectAdModal.isOpen && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-white p-6 sm:p-8 rounded-md max-w-lg w-full border border-rose-300 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-100">
+              <div>
+                <span className="text-[10px] font-bold text-rose-600 uppercase tracking-widest block">
+                  ADMIN MODERATION ACTION
+                </span>
+                <h3 className="font-heading text-lg text-charcoal">Reject Seller Banner Ad</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRejectAdModal({ isOpen: false, ad: null, reason: '' })}
+                className="p-1 text-gray-400 hover:text-charcoal cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmRejectAd} className="flex flex-col gap-4">
+              <div className="p-3 bg-amber-50 border-l-3 border-amber-500 rounded text-xs text-amber-900">
+                Banner for <strong>{rejectAdModal.ad?.sellerShopName}</strong>: "{rejectAdModal.ad?.title}"
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase text-gray-600 mb-1.5 block">
+                  Rejection Reason *
+                </label>
+                <textarea
+                  rows="3"
+                  required
+                  placeholder="Specify reason for rejection (e.g. Image resolution poor, inappropriate text content, incorrect aspect ratio)..."
+                  value={rejectAdModal.reason}
+                  onChange={(e) => setRejectAdModal({ ...rejectAdModal, reason: e.target.value })}
+                  className="input-field text-xs bg-rose-50/20 border-rose-200 focus:border-rose-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="submit" className="btn-gold bg-rose-600 hover:bg-rose-700 text-white flex-1 py-2.5 text-xs font-semibold cursor-pointer">
+                  CONFIRM REJECTION
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRejectAdModal({ isOpen: false, ad: null, reason: '' })}
+                  className="btn-outline py-2.5 px-5 text-xs cursor-pointer"
+                >
+                  CANCEL
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       <InvoiceModal
         order={selectedInvoiceOrder}
         isOpen={Boolean(selectedInvoiceOrder)}

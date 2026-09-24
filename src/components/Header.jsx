@@ -67,10 +67,14 @@ export function Header({
   const handleNavClick = (id) => {
     setActiveTab(id);
     setIsMobileMenuOpen(false);
-    if (id === 'collections') {
+    if (id === 'shop') {
+      window.location.hash = 'shop';
+    } else if (id === 'collections') {
+      window.location.hash = 'collections';
       const el = document.getElementById('section-new-arrivals');
       if (el) el.scrollIntoView({ behavior: 'smooth' });
     } else {
+      window.location.hash = id;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };

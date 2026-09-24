@@ -4,6 +4,8 @@ import { NewArrivalsSliderSection } from './NewArrivalsSliderSection';
 import { BrandStatementSection } from './BrandStatementSection';
 import { JewelleryVideoAccordionSection } from './JewelleryVideoAccordionSection';
 import { CountdownDeal } from './CountdownDeal';
+import { RoyalNecklaceAdsSlider } from './RoyalNecklaceAdsSlider';
+import { TopSellingProductsSection } from './TopSellingProductsSection';
 import { ScrollReveal } from './ScrollReveal';
 import {
   CATEGORIES,
@@ -100,45 +102,15 @@ export function HomeSection({
       {/* SECTION 3 — 4-COLUMN INTERACTIVE VIDEO ACCORDION */}
       <JewelleryVideoAccordionSection onSelectCategory={onSelectCategory} onNavigateShop={onNavigateShop} />
 
-      {/* SECTION 2 — INTRO / BRAND STORY */}
-      <section
-        id="section-brand"
-        className="py-16 sm:py-24 bg-[#FAF6F0] border-b border-borderGold/20 overflow-hidden"
-      >
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-            <ScrollReveal animation="fade-left">
-              <div>
-                <span className="eyebrow">TIMELESS SOPHISTICATION</span>
-                <h2 className="section-title text-2xl sm:text-4xl">"Jewellery Designed to Become Part of Your Story"</h2>
-                <p className="text-base sm:text-lg text-brownMuted leading-relaxed mb-4 font-light">
-                  Ratnaya brings together centuries of royal Indian goldsmithing, certified diamond craftsmanship, and contemporary elegance under one canopy.
-                </p>
-                <p className="text-sm sm:text-base text-charcoal leading-relaxed mb-8">
-                  Connecting discerning patrons directly with trusted independent jewellers from Jaipur, Mumbai, Hyderabad, and Kolkata, every piece is accompanied by 6-digit HUID BIS hallmarking and international certificates.
-                </p>
-                <button onClick={onNavigateAbout} className="btn-outline-gold py-3 px-8">
-                  KNOW MORE <ArrowRight size={15} />
-                </button>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal animation="fade-right">
-              <div className="relative">
-                <div className="aspect-[4/3] rounded-md overflow-hidden shadow-medium border border-borderGold">
-                  <img
-                    src="/assets/jewellery/necklace/videoframe_3765.png"
-                    alt="Jewellery Story"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                <div className="hidden sm:block absolute -top-4 -right-4 w-full h-full border border-gold rounded-md -z-10" />
-              </div>
-            </ScrollReveal>
-          </div>
-        </div>
-      </section>
+      {/* SECTION 2 — TOP SELLING PRODUCTS WITH CATEGORY TABS */}
+      <TopSellingProductsSection
+        onSelectProduct={onSelectProduct}
+        onQuickView={onQuickView}
+        onAddToCart={onAddToCart}
+        onToggleWishlist={onToggleWishlist}
+        wishlistIds={wishlistIds}
+        onNavigateShop={onNavigateShop}
+      />
 
       {/* SECTION 3 — FEATURE / BENEFITS */}
       <section className="py-12 sm:py-16 bg-white border-b border-gray-100">
@@ -259,35 +231,11 @@ export function HomeSection({
       {/* SECTION 6 — DEAL / PROMOTIONAL BANNER WITH COUNTDOWN */}
       <CountdownDeal onNavigateShop={onNavigateShop} />
 
-      {/* SECTION 7 — NECKLACE FEATURE */}
-      <section className="py-16 sm:py-24 bg-[#FAF6F0] border-b border-borderGold/20 overflow-hidden">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-            <ScrollReveal animation="fade-left">
-              <div className="group aspect-[4/3] rounded-md overflow-hidden border border-borderGold shadow-md cursor-pointer">
-                <img src="/assets/jewellery/necklace/1.jpg" alt="Radiate Beauty With Necklaces" className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105" />
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal animation="fade-right">
-              <div>
-                <span className="eyebrow">ROYAL NECKLACE COLLECTION</span>
-                <h2 className="section-title text-2xl sm:text-4xl">Radiate Beauty With Necklaces</h2>
-                <h4 className="text-lg sm:text-xl text-gold-dark font-heading mb-4 font-normal">
-                  "A Symbol of Love, Beauty and Sophistication"
-                </h4>
-                <p className="text-sm sm:text-base text-gray-600 leading-relaxed mb-6">
-                  Adorn your neck with royal Kundan chokers, Basra pearl strands, and glowing Zambian emerald haar crafted for grand wedding celebrations.
-                </p>
-                <div className="flex flex-wrap gap-4">
-                  <button onClick={onNavigateAbout} className="btn-outline px-6 py-3">KNOW MORE</button>
-                  <button onClick={onNavigateShop} className="btn-gold px-6 py-3">SHOP NOW <ArrowRight size={15} /></button>
-                </div>
-              </div>
-            </ScrollReveal>
-          </div>
-        </div>
-      </section>
+      {/* SECTION 7 — ROYAL NECKLACE ADS / FEATURE SLIDER */}
+      <RoyalNecklaceAdsSlider
+        onNavigateShop={onNavigateShop}
+        onNavigateAbout={onNavigateAbout}
+      />
 
       {/* SECTION 8 — BRACELET FEATURE */}
       <section className="py-16 sm:py-24 bg-white overflow-hidden">

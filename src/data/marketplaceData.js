@@ -1643,7 +1643,7 @@ export const BLOG_POSTS = [
     category: 'Jewellery Trends',
     date: 'February 22, 2026',
     author: 'Ratnaya Fashion Desk',
-    image: '/assets/jewellery/earring/1.jpg',
+    image: '/assets/jewellery/earrings/1.jpg',
     excerpt: 'From oversized Chandbalis to shoulder-grazing solitaire drops, see what high-fashion icons are wearing.',
     content: 'Statement earrings are taking center stage in 2026 with 360-degree reverse Meenakari enamel details.'
   },

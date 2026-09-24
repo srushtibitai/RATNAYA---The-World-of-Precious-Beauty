@@ -24,6 +24,7 @@ import { CartDrawer } from './components/CartDrawer';
 import { WishlistDrawer } from './components/WishlistDrawer';
 import { QuickViewModal } from './components/QuickViewModal';
 import { AuthModal } from './components/AuthModal';
+import { OfferModal } from './components/OfferModal';
 import { LogoIntroSplash } from './components/LogoIntroSplash';
 import { PRODUCTS as INITIAL_PRODUCTS } from './data/marketplaceData';
 import { api } from './services/api';
@@ -33,6 +34,7 @@ export default function App() {
   const [showIntro, setShowIntro] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
   const [activeRole, setActiveRole] = useState('BUYER');
+  const [accountSubTab, setAccountSubTab] = useState('profile');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -53,7 +55,28 @@ export default function App() {
   useEffect(() => {
     // Scroll to top on tab change
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [activeTab]);
+
+    // Sync window.location.hash with activeTab so browser URL bar is always accurate
+    if (activeTab === 'shop') {
+      const targetHash = selectedCategory && selectedCategory !== 'all' ? `#shop?category=${selectedCategory}` : '#shop';
+      if (window.location.hash !== targetHash) {
+        window.location.hash = targetHash.replace('#', '');
+      }
+    } else if (activeTab === 'product-detail' && selectedProduct) {
+      const prodId = selectedProduct.id || selectedProduct._id;
+      if (prodId && window.location.hash !== `#product/${prodId}`) {
+        window.location.hash = `product/${prodId}`;
+      }
+    } else if (activeTab === 'seller-store' && selectedSellerId) {
+      if (window.location.hash !== `#store/${selectedSellerId}`) {
+        window.location.hash = `store/${selectedSellerId}`;
+      }
+    } else if (activeTab) {
+      if (window.location.hash !== `#${activeTab}`) {
+        window.location.hash = activeTab;
+      }
+    }
+  }, [activeTab, selectedCategory]);
 
   // Sync state when currentUser changes
   useEffect(() => {
@@ -72,7 +95,7 @@ export default function App() {
     loadBackendData();
   }, []);
 
-  // Handle Hash URL Routing (#product/:id, #shop?sellerId=..., etc.)
+  // Handle Hash URL Routing (#product/:id, #shop?category=..., #collections, #category/:id, etc.)
   useEffect(() => {
     async function handleHashRoute() {
       const hash = window.location.hash || '';
@@ -82,10 +105,8 @@ export default function App() {
       if (hash.startsWith('#product/')) {
         const targetId = decodeURIComponent(hash.replace('#product/', '')).trim();
         if (targetId) {
-          // A. Search in already loaded products state
           let match = (products || []).find((p) => String(p.id) === String(targetId) || String(p._id) === String(targetId) || String(p.sku) === String(targetId));
 
-          // B. If not found in memory, fetch directly from backend API endpoint /api/products/:id
           if (!match) {
             try {
               const res = await api.getProductById(targetId);
@@ -97,7 +118,6 @@ export default function App() {
             }
           }
 
-          // C. Fallback to INITIAL_PRODUCTS
           if (!match) {
             match = INITIAL_PRODUCTS.find((p) => String(p.id) === String(targetId) || String(p._id) === String(targetId) || String(p.sku) === String(targetId));
           }
@@ -125,10 +145,71 @@ export default function App() {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       }
-      // 3. Direct Tab Hashes (#shop, #cart, #checkout, #collections, #about, #faq, etc.)
+      // 3. Shop Category Link: #shop?category=necklaces OR #category/necklaces OR #cat=necklaces
+      else if (hash.includes('category=') || hash.includes('cat=') || hash.startsWith('#category/')) {
+        let catId = 'all';
+        if (hash.includes('category=')) {
+          catId = hash.split('category=')[1]?.split('&')[0];
+        } else if (hash.includes('cat=')) {
+          catId = hash.split('cat=')[1]?.split('&')[0];
+        } else if (hash.startsWith('#category/')) {
+          catId = hash.replace('#category/', '').split('?')[0];
+        }
+        if (catId) {
+          setSelectedCategory(decodeURIComponent(catId).toLowerCase());
+          setActiveTab('shop');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
+      // 4. Collections Page Route: #collections
+      else if (hash.startsWith('#collections')) {
+        setActiveTab('collections');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      // 5. Direct Tab Hashes (#home, #shop, #about, #blog, #contact, #faq, #account, #checkout, #order-tracking, etc.)
       else if (hash.startsWith('#')) {
-        const tabName = hash.replace('#', '').trim();
-        if (['home', 'shop', 'collections', 'about', 'contact', 'faq', 'checkout', 'seller-dashboard', 'admin-dashboard'].includes(tabName)) {
+        const cleanHash = hash.replace('#', '').trim();
+        const tabName = cleanHash.split('?')[0];
+
+        if (tabName === 'order-tracking' || tabName === 'tracking') {
+          setActiveRole('BUYER');
+          setAccountSubTab('orders');
+          setActiveTab('account');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+
+        if (tabName === 'returns' || tabName === 'refunds' || tabName === 'return-policy') {
+          setActiveTab('return-policy');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+
+        const validTabs = [
+          'home',
+          'shop',
+          'collections',
+          'about',
+          'blog',
+          'contact',
+          'faq',
+          'account',
+          'checkout',
+          'seller-dashboard',
+          'admin-dashboard',
+          'seller-register',
+          'terms-conditions',
+          'privacy-policy',
+          'shipping-policy',
+          'return-policy',
+          'returns',
+          'order-tracking',
+          'tracking'
+        ];
+        if (validTabs.includes(tabName)) {
+          if (tabName === 'account') {
+            setAccountSubTab('profile');
+          }
           setActiveTab(tabName);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -148,6 +229,23 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isWishlistOpen, setIsWishlistOpen] = useState(false);
   const [quickViewProduct, setQuickViewProduct] = useState(null);
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+
+  // Auto-open Offer Modal when site loads (1.5 seconds after load)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const alreadySeen = sessionStorage.getItem('ratnaya_offer_seen');
+      if (!alreadySeen) {
+        setIsOfferModalOpen(true);
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleCloseOfferModal = () => {
+    setIsOfferModalOpen(false);
+    sessionStorage.setItem('ratnaya_offer_seen', 'true');
+  };
 
   // Cart & Wishlist state (Default to 0 / empty array until items added)
   const [cartItems, setCartItems] = useState([]);
@@ -155,7 +253,7 @@ export default function App() {
 
   // Body Scroll Lock effect when drawers or modals are open
   useEffect(() => {
-    if (isSearchOpen || isCartOpen || isWishlistOpen || quickViewProduct || isAuthOpen) {
+    if (isSearchOpen || isCartOpen || isWishlistOpen || quickViewProduct || isAuthOpen || isOfferModalOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'auto';
@@ -163,7 +261,7 @@ export default function App() {
     return () => {
       document.body.style.overflow = 'auto';
     };
-  }, [isSearchOpen, isCartOpen, isWishlistOpen, quickViewProduct, isAuthOpen]);
+  }, [isSearchOpen, isCartOpen, isWishlistOpen, quickViewProduct, isAuthOpen, isOfferModalOpen]);
 
   const effectiveUserId = currentUser ? currentUser.id || currentUser._id || 'buyer-1' : 'buyer-guest';
 
@@ -342,13 +440,20 @@ export default function App() {
   };
 
   const handleSelectCategory = (categoryId) => {
-    setSelectedCategory(categoryId);
+    const cleanCat = (categoryId || 'all').toLowerCase();
+    setSelectedCategory(cleanCat);
     setActiveTab('shop');
+    if (cleanCat && cleanCat !== 'all') {
+      window.location.hash = `shop?category=${cleanCat}`;
+    } else {
+      window.location.hash = 'shop';
+    }
   };
 
   const handleViewSellerStore = (sellerId) => {
     setSelectedSellerId(sellerId);
     setActiveTab('seller-store');
+    window.location.hash = `store/${sellerId}`;
   };
 
   const handleAuthSuccess = (userData) => {
@@ -382,7 +487,16 @@ export default function App() {
       {/* HEADER */}
       <Header
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          if (tab === 'home') {
+            window.location.hash = '';
+          } else if (tab === 'shop') {
+            window.location.hash = selectedCategory !== 'all' ? `shop?category=${selectedCategory}` : 'shop';
+          } else {
+            window.location.hash = tab;
+          }
+        }}
         cartCount={cartCount}
         wishlistCount={wishlistItems.length}
         onOpenCart={() => setIsCartOpen(true)}
@@ -439,6 +553,7 @@ export default function App() {
               wishlistItems={wishlistItems}
               onAddToCart={handleAddToCart}
               onNavigateShop={() => setActiveTab('shop')}
+              initialSubTab={accountSubTab}
             />
           ) : (
             <div style={{ padding: '100px 20px', textAlign: 'center', backgroundColor: '#FAF6F0', minHeight: '60vh' }}>
@@ -568,6 +683,7 @@ export default function App() {
         setActiveTab={setActiveTab}
         setActiveRole={setActiveRole}
         onSelectCategory={handleSelectCategory}
+        setAccountSubTab={setAccountSubTab}
       />
 
       {/* OVERLAY MODALS & DRAWERS */}
@@ -613,6 +729,16 @@ export default function App() {
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onAuthSuccess={handleAuthSuccess}
+      />
+
+      {/* PROMOTIONAL WELCOME OFFER MODAL */}
+      <OfferModal
+        isOpen={isOfferModalOpen}
+        onClose={handleCloseOfferModal}
+        onNavigateShop={() => {
+          handleSelectCategory('all');
+          handleCloseOfferModal();
+        }}
       />
     </div>
   );

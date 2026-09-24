@@ -1,19 +1,63 @@
 // RATNAYA — Frontend REST API Service Integration
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://ratnaya-backend.onrender.com/api';
-// const API_BASE_URL = 'http://localhost:5050/api';
+const getApiBaseUrl = () => {
+  // if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
+  // if (typeof window !== 'undefined') {
+  const host = window.location.hostname;
+  // if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.')) {
+  return `http://${host}:5050/api`;
+  //   }
+  // }
+
+
+  // return 'https://ratnaya-backend.onrender.com/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export function getImageUrl(imagePath) {
   if (!imagePath) return '/assets/jewellery/necklace/1.jpg';
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://') || imagePath.startsWith('data:')) {
-    return imagePath;
+
+  // Normalize legacy singular paths to existing folder assets
+  let normalizedPath = imagePath
+    .replace('/assets/jewellery/earring/', '/assets/jewellery/earrings/')
+    .replace('/assets/jewellery/pendant/', '/assets/jewellery/necklace/');
+
+  if (normalizedPath.startsWith('http://') || normalizedPath.startsWith('https://') || normalizedPath.startsWith('data:')) {
+    return normalizedPath;
   }
-  // Frontend static assets (/assets/...) are served directly by Vite frontend server
-  if (imagePath.startsWith('/assets/') || imagePath.startsWith('assets/')) {
-    return imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
-  }
+
   const backendBase = API_BASE_URL.replace(/\/api\/?$/, '');
-  const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+  const cleanPath = normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`;
+
+  // Files dynamically uploaded to Express Backend (files with jewel_, /general/, or /uploads/)
+  if (
+    normalizedPath.includes('jewel_') ||
+    normalizedPath.includes('banner_') ||
+    normalizedPath.includes('/general/') ||
+    normalizedPath.startsWith('/uploads/') ||
+    normalizedPath.startsWith('uploads/')
+  ) {
+    return `${backendBase}${cleanPath}`;
+  }
+
+  // Pre-bundled static mock assets shipped in frontend public directory (/assets/jewellery/hero/main1.jpg, etc.)
+  if (
+    normalizedPath.startsWith('/assets/jewellery/hero/') ||
+    normalizedPath.startsWith('/assets/jewellery/necklace/') ||
+    normalizedPath.startsWith('/assets/jewellery/earrings/') ||
+    normalizedPath.startsWith('/assets/jewellery/rings/') ||
+    normalizedPath.startsWith('/assets/jewellery/bracelet/') ||
+    normalizedPath.startsWith('/assets/jewellery/bangles/')
+  ) {
+    return cleanPath;
+  }
+
+  // Fallback for any uploaded asset path
+  if (normalizedPath.startsWith('/assets/')) {
+    return `${backendBase}${cleanPath}`;
+  }
+
   return `${backendBase}${cleanPath}`;
 }
 
@@ -519,6 +563,56 @@ export const api = {
       method: 'POST',
       body: { documentType, documentNumber }
     });
+  },
+
+  // Seller Ads (Top Banner & Section Ads with 3-minute 3-ad batch rotation)
+  async createSellerAd(adData) {
+    return request('/seller-ads', {
+      method: 'POST',
+      body: adData
+    });
+  },
+
+  async getSellerAds(sellerId) {
+    return request(`/seller-ads/seller/${sellerId}`);
+  },
+
+  async getActiveSellerAds(adType = 'section') {
+    return request(`/seller-ads/active?type=${adType}`);
+  },
+
+  async getAllSellerAdsAdmin(status = 'all') {
+    return request(`/seller-ads/all?status=${status}`);
+  },
+
+  async approveSellerAd(id) {
+    return request(`/seller-ads/${id}/approve`, {
+      method: 'PUT'
+    });
+  },
+
+  async rejectSellerAd(id, reason) {
+    return request(`/seller-ads/${id}/reject`, {
+      method: 'PUT',
+      body: { reason }
+    });
+  },
+
+  async deleteSellerAd(id) {
+    return request(`/seller-ads/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async toggleSellerAdStatus(id, status) {
+    return request(`/seller-ads/${id}/status`, {
+      method: 'PUT',
+      body: { status }
+    });
+  },
+
+  async getWelcomeOffer() {
+    return request('/masters/welcome-offer');
   },
 
   getImageUrl

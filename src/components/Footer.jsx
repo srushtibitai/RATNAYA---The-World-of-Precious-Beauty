@@ -12,7 +12,7 @@ import {
   Lock
 } from 'lucide-react';
 
-export function Footer({ setActiveTab, setActiveRole, onSelectCategory }) {
+export function Footer({ setActiveTab, setActiveRole, onSelectCategory, setAccountSubTab }) {
   return (
     <footer
       id="section-footer"
@@ -102,22 +102,22 @@ export function Footer({ setActiveTab, setActiveRole, onSelectCategory }) {
             </h4>
             <ul className="flex flex-col gap-2.5 text-xs text-gray-400">
               <li>
-                <button onClick={() => { onSelectCategory && onSelectCategory('rings'); setActiveTab('shop'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Rings</button>
+                <button onClick={() => { onSelectCategory && onSelectCategory('rings'); setActiveTab('shop'); window.location.hash = 'shop?category=rings'; window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Rings</button>
               </li>
               <li>
-                <button onClick={() => { onSelectCategory && onSelectCategory('necklaces'); setActiveTab('shop'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Necklaces</button>
+                <button onClick={() => { onSelectCategory && onSelectCategory('necklaces'); setActiveTab('shop'); window.location.hash = 'shop?category=necklaces'; window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Necklaces</button>
               </li>
               <li>
-                <button onClick={() => { onSelectCategory && onSelectCategory('earrings'); setActiveTab('shop'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Earrings</button>
+                <button onClick={() => { onSelectCategory && onSelectCategory('earrings'); setActiveTab('shop'); window.location.hash = 'shop?category=earrings'; window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Earrings</button>
               </li>
               <li>
-                <button onClick={() => { onSelectCategory && onSelectCategory('bracelets'); setActiveTab('shop'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Bracelets</button>
+                <button onClick={() => { onSelectCategory && onSelectCategory('bracelets'); setActiveTab('shop'); window.location.hash = 'shop?category=bracelets'; window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Bracelets</button>
               </li>
               <li>
-                <button onClick={() => { onSelectCategory && onSelectCategory('bangles'); setActiveTab('shop'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Bangles</button>
+                <button onClick={() => { onSelectCategory && onSelectCategory('bangles'); setActiveTab('shop'); window.location.hash = 'shop?category=bangles'; window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Bangles</button>
               </li>
               <li>
-                <button onClick={() => { onSelectCategory && onSelectCategory('all'); setActiveTab('shop'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">New Arrivals</button>
+                <button onClick={() => { onSelectCategory && onSelectCategory('all'); setActiveTab('shop'); window.location.hash = 'shop'; window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">New Arrivals</button>
               </li>
             </ul>
           </div>
@@ -128,11 +128,68 @@ export function Footer({ setActiveTab, setActiveRole, onSelectCategory }) {
               Customer Care
             </h4>
             <ul className="flex flex-col gap-2.5 text-xs text-gray-400">
-              <li><button onClick={() => { setActiveTab('contact'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Contact Us</button></li>
-              <li><button onClick={() => { setActiveTab('shipping-policy'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Shipping Policy</button></li>
-              <li><button onClick={() => { setActiveTab('shipping-policy'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Returns & Refunds</button></li>
-              <li><button onClick={() => { setActiveTab('faq'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">FAQ</button></li>
-              <li><button onClick={() => { setActiveRole('BUYER'); setActiveTab('account'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Order Tracking</button></li>
+              <li>
+                <button
+                  onClick={() => {
+                    setActiveTab('contact');
+                    window.location.hash = 'contact';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0"
+                >
+                  Contact Us
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => {
+                    setActiveTab('shipping-policy');
+                    window.location.hash = 'shipping-policy';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0"
+                >
+                  Shipping Policy
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => {
+                    setActiveTab('return-policy');
+                    window.location.hash = 'return-policy';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0"
+                >
+                  Returns & Refunds
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => {
+                    setActiveTab('faq');
+                    window.location.hash = 'faq';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0"
+                >
+                  FAQ
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => {
+                    setActiveRole('BUYER');
+                    if (setAccountSubTab) setAccountSubTab('orders');
+                    setActiveTab('account');
+                    window.location.hash = 'order-tracking';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0"
+                >
+                  Order Tracking
+                </button>
+              </li>
             </ul>
           </div>
 
@@ -144,7 +201,7 @@ export function Footer({ setActiveTab, setActiveRole, onSelectCategory }) {
             <ul className="flex flex-col gap-2.5 text-xs text-gray-400">
               <li>
                 <button
-                  onClick={() => { setActiveRole('SELLER'); setActiveTab('seller-register'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  onClick={() => { setActiveRole('SELLER'); setActiveTab('seller-register'); window.location.hash = 'seller-register'; window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   className="text-gold font-medium hover:underline bg-transparent border-none cursor-pointer p-0"
                 >
                   Become a Seller
@@ -152,16 +209,16 @@ export function Footer({ setActiveTab, setActiveRole, onSelectCategory }) {
               </li>
               <li>
                 <button
-                  onClick={() => { setActiveRole('SELLER'); setActiveTab('seller-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  onClick={() => { setActiveRole('SELLER'); setActiveTab('seller-dashboard'); window.location.hash = 'seller-dashboard'; window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0"
                 >
                   Seller Login
                 </button>
               </li>
-              <li><button onClick={() => { setActiveTab('terms-conditions'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Seller Guide</button></li>
+              <li><button onClick={() => { setActiveTab('terms-conditions'); window.location.hash = 'terms-conditions'; window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Seller Guide</button></li>
               <li>
                 <button
-                  onClick={() => { setActiveRole('ADMIN'); setActiveTab('admin-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  onClick={() => { setActiveRole('ADMIN'); setActiveTab('admin-dashboard'); window.location.hash = 'admin-dashboard'; window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   className="text-gray-500 hover:text-gray-300 transition-colors bg-transparent border-none cursor-pointer p-0"
                 >
                   Admin Console
@@ -176,10 +233,10 @@ export function Footer({ setActiveTab, setActiveRole, onSelectCategory }) {
               Company
             </h4>
             <ul className="flex flex-col gap-2.5 text-xs text-gray-400">
-              <li><button onClick={() => { setActiveTab('about'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">About Ratnaya</button></li>
-              <li><button onClick={() => { setActiveTab('about'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Our Heritage</button></li>
-              <li><button onClick={() => { setActiveTab('privacy-policy'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Privacy Policy</button></li>
-              <li><button onClick={() => { setActiveTab('terms-conditions'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Terms & Conditions</button></li>
+              <li><button onClick={() => { setActiveTab('about'); window.location.hash = 'about'; window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">About Ratnaya</button></li>
+              <li><button onClick={() => { setActiveTab('about'); window.location.hash = 'about'; window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Our Heritage</button></li>
+              <li><button onClick={() => { setActiveTab('privacy-policy'); window.location.hash = 'privacy-policy'; window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Privacy Policy</button></li>
+              <li><button onClick={() => { setActiveTab('terms-conditions'); window.location.hash = 'terms-conditions'; window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-gold transition-colors bg-transparent border-none cursor-pointer p-0">Terms & Conditions</button></li>
             </ul>
           </div>
         </div>

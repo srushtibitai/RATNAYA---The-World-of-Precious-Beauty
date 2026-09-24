@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, MoveRight } from 'lucide-react';
-import { api } from '../services/api';
+import { api, getImageUrl } from '../services/api';
 
 const SWARNA_SLIDES = [
   {
@@ -64,15 +64,53 @@ export function HeroSlider({ onNavigateShop, onSelectCategory }) {
   const [activeSlideIdx, setActiveSlideIdx] = useState(0);
   const [activeThumbIdx, setActiveThumbIdx] = useState(0);
 
-  // Fetch dynamic hero slides from MongoDB Database API
+  // Fetch dynamic hero slides & seller top banner ads from MongoDB API
   useEffect(() => {
     let isMounted = true;
     async function loadDynamicBanners() {
       try {
+        // 1. Fetch active seller top banner ads from API
+        const sellerAdsRes = await api.getActiveSellerAds('top_banner');
+        // console.log("sellerAdsRes", sellerAdsRes)
+        let adsList = [];
+        if (Array.isArray(sellerAdsRes)) {
+          adsList = sellerAdsRes;
+        } else if (sellerAdsRes && typeof sellerAdsRes === 'object') {
+          if (Array.isArray(sellerAdsRes.activeBatchAds) && sellerAdsRes.activeBatchAds.length > 0) {
+            adsList = sellerAdsRes.activeBatchAds;
+          } else if (Array.isArray(sellerAdsRes.allActiveAds) && sellerAdsRes.allActiveAds.length > 0) {
+            adsList = sellerAdsRes.allActiveAds;
+          } else if (Array.isArray(sellerAdsRes.data)) {
+            adsList = sellerAdsRes.data;
+          }
+        }
+        console.log("adsList", adsList)
+        // 2. Fetch admin hero banners if any
         const res = await api.getBanners();
         const dbBanners = (res && res.data && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
-        if (isMounted && dbBanners.length > 0) {
-          const formatted = dbBanners.map((b, idx) => ({
+
+        let dynamicSlides = [];
+
+        if (adsList.length > 0) {
+          dynamicSlides = adsList.map((ad, idx) => ({
+            id: `seller-top-ad-${ad._id || idx}`,
+            isSellerAd: true,
+            sellerShopName: ad.sellerShopName || ad.sellerName || 'Kundan Jewels Jaipur',
+            eyebrow: ad.eyebrow || 'TIMELESS SOPHISTICATION',
+            watermark: ad.watermark || 'INCOMPARABLE',
+            title: ad.title,
+            description: ad.description,
+            mainImage: getImageUrl(ad.mainImage || ad.image),
+            ringAccent: ad.ringAccent || SWARNA_SLIDES[idx % 3].ringAccent,
+            accentImage: getImageUrl(ad.accentImage || ad.mainImage || ad.image || SWARNA_SLIDES[idx % 3].accentImage),
+            targetCategory: ad.targetCategory || 'all',
+            buttonText: ad.ctaPrimary || 'Know More',
+            thumbnails: (ad.thumbnails && Array.isArray(ad.thumbnails) && ad.thumbnails.length === 4)
+              ? ad.thumbnails.map((t) => getImageUrl(t))
+              : SWARNA_SLIDES[idx % 3].thumbnails
+          }));
+        } else if (dbBanners.length > 0) {
+          dynamicSlides = dbBanners.map((b, idx) => ({
             id: b.slideId || b._id || idx + 1,
             eyebrow: b.eyebrow || SWARNA_SLIDES[idx % 3].eyebrow,
             watermark: b.watermark || SWARNA_SLIDES[idx % 3].watermark,
@@ -85,15 +123,43 @@ export function HeroSlider({ onNavigateShop, onSelectCategory }) {
             buttonText: b.buttonText || 'Know More',
             thumbnails: b.thumbnails && b.thumbnails.length > 0 ? b.thumbnails : SWARNA_SLIDES[idx % 3].thumbnails
           }));
-          setSlides(formatted);
+        }
+
+        if (isMounted) {
+          if (dynamicSlides.length > 0) {
+            // Priority Batching: 3 slides per batch. Rotates batch every 5 minutes
+            const BATCH_SIZE = 3;
+            const FIVE_MINUTES_MS = 5 * 60 * 1000;
+            const currentSlot = Math.floor(Date.now() / FIVE_MINUTES_MS);
+            const totalBatches = Math.ceil(dynamicSlides.length / BATCH_SIZE);
+            const currentBatchIdx = currentSlot % totalBatches;
+
+            const startIdx = currentBatchIdx * BATCH_SIZE;
+            const batchDynamicSlides = dynamicSlides.slice(startIdx, startIdx + BATCH_SIZE);
+
+            // Fill remaining slots up to 3 with SWARNA_SLIDES so there are ALWAYS 3 slides total (dots 1 -> 2 -> 3)
+            let finalSlides = [...batchDynamicSlides];
+            if (finalSlides.length < 3) {
+              const fillCount = 3 - finalSlides.length;
+              finalSlides = [...finalSlides, ...SWARNA_SLIDES.slice(3 - fillCount)];
+            }
+
+            setSlides(finalSlides);
+          } else {
+            // Only use static SWARNA_SLIDES when 0 API ads exist
+            setSlides(SWARNA_SLIDES);
+          }
         }
       } catch (err) {
-        console.warn('Hero Banners MongoDB API fallback:', err);
+        console.warn('Hero Banners API fallback:', err);
       }
     }
+
     loadDynamicBanners();
+    const pollTimer = setInterval(loadDynamicBanners, 15000); // 15 sec polling for fast live updates
     return () => {
       isMounted = false;
+      clearInterval(pollTimer);
     };
   }, []);
 
@@ -222,7 +288,7 @@ export function HeroSlider({ onNavigateShop, onSelectCategory }) {
                   : 'hover:bg-[#AC805D]'
                   }`}
               >
-                {s.id || idx + 1}
+                {idx + 1}
               </button>
               {idx < slides.length - 1 && (
                 <span className="text-[#AC805D] text-xs flex items-center">

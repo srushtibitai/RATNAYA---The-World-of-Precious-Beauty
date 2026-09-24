@@ -28,8 +28,15 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 
-export function BuyerAccountPage({ user, wishlistItems = [], onAddToCart, onNavigateShop }) {
-  const [activeTab, setActiveTab] = useState('profile');
+export function BuyerAccountPage({ user, wishlistItems = [], onAddToCart, onNavigateShop, initialSubTab = 'profile' }) {
+  const [activeTab, setActiveTab] = useState(initialSubTab || 'profile');
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveTab(initialSubTab);
+    }
+  }, [initialSubTab]);
+
   const userId = user?.id || user?._id || 'buyer-demo-101';
 
   // Dynamic MongoDB States
