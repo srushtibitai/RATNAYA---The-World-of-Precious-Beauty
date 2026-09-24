@@ -180,6 +180,12 @@ export const api = {
     });
   },
 
+  async deleteProduct(id) {
+    return request(`/products/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
   async uploadImage(file, category = 'general', sellerName = '', docType = '') {
     try {
       const formData = new FormData();

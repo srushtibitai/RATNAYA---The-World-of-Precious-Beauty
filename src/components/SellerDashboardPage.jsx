@@ -89,6 +89,10 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
   const [sellerProductsList, setSellerProductsList] = useState([]);
   const [expandedOrders, setExpandedOrders] = useState({});
   const [productViewMode, setProductViewMode] = useState('table'); // 'table' | 'grid'
+  const [productCurrentPage, setProductCurrentPage] = useState(1);
+  const productsPerPage = 10;
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [productStatusFilter, setProductStatusFilter] = useState('All');
 
   const toggleOrderExpand = (orderId) => {
     setExpandedOrders((prev) => ({
@@ -405,6 +409,43 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
       isMounted = false;
     };
   }, [activeTab, seller.id, seller.name, currentUser?.id]);
+
+  const handleDeleteProduct = async (p) => {
+    const pId = p._id || p.id;
+    const pName = p.name || 'this product';
+
+    // Validation: Check if product is linked to any active order (Placed/Confirmed/Shipped) that has not been Delivered, Refunded, or Cancelled
+    const activeStatuses = ['Order Requested', 'Pending Acceptance', 'Processing', 'Confirmed', 'Shipped', 'Return Requested'];
+    const activeOrder = sellerOrders.find((ord) => {
+      if (!activeStatuses.includes(ord.status)) return false;
+      if (Array.isArray(ord.items)) {
+        return ord.items.some((item) => {
+          const itemId = String(item.productId || item.id || item._id || item.name || '');
+          return itemId === String(pId) || itemId === pName;
+        });
+      }
+      return false;
+    });
+
+    if (activeOrder) {
+      alert(`⚠️ Cannot Delete Product!\n\n"${pName}" is linked to an active order (${activeOrder.id || 'Order'}) with status "${activeOrder.status}".\n\nProducts with active pending orders cannot be deleted until the order is Delivered, Refunded, or Cancelled.`);
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete "${pName}"? This action cannot be undone.`)) return;
+
+    try {
+      const res = await api.deleteProduct(pId);
+      if (res && res.success) {
+        setSellerProductsList((prev) => prev.filter((item) => (item._id || item.id) !== pId));
+        alert(`✅ Product "${pName}" deleted successfully!`);
+      } else {
+        alert(res?.message || res?.error || `⚠️ Cannot delete product because it has active pending orders.`);
+      }
+    } catch (err) {
+      alert(`⚠️ Delete Error: ${err.message}`);
+    }
+  };
 
   // Merchant Order Filters & Sorting State
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
@@ -1054,255 +1095,403 @@ export function SellerDashboardPage({ currentUser, sellerId }) {
             )}
 
             {/* MY PRODUCTS TAB */}
-            {activeTab === 'products' && (
-              <div className="bg-white p-6 border border-gray-200 rounded-sm shadow-sm">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
-                  <div>
-                    <h3 className="font-heading text-xl">Managed Products Catalog</h3>
-                    <p className="text-xs text-gray-500">View your active inventory or share your full catalog link on social media.</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* View Mode Switcher Toggle */}
-                    <div className="flex items-center bg-gray-100 p-0.5 rounded border border-gray-200">
+            {activeTab === 'products' && (() => {
+              const filteredSellerProducts = sellerProductsList.filter((p) => {
+                if (productSearchQuery.trim()) {
+                  const q = productSearchQuery.toLowerCase().trim();
+                  const nameMatch = (p.name || '').toLowerCase().includes(q);
+                  const skuMatch = (p.sku || p.id || '').toLowerCase().includes(q);
+                  const catMatch = (p.category || '').toLowerCase().includes(q);
+                  const metalMatch = (p.metal || '').toLowerCase().includes(q);
+                  if (!nameMatch && !skuMatch && !catMatch && !metalMatch) return false;
+                }
+                if (productStatusFilter !== 'All') {
+                  const status = p.approvalStatus || 'Approved';
+                  if (status !== productStatusFilter) return false;
+                }
+                return true;
+              });
+
+              const totalProductPages = Math.ceil(filteredSellerProducts.length / productsPerPage) || 1;
+              const indexOfLastProduct = productCurrentPage * productsPerPage;
+              const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
+              const paginatedSellerProducts = filteredSellerProducts.slice(indexOfFirstProduct, indexOfLastProduct);
+
+              return (
+                <div className="bg-white p-6 border border-gray-200 rounded-sm shadow-sm">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-gray-100">
+                    <div>
+                      <h3 className="font-heading text-xl">Managed Products Catalog</h3>
+                      <p className="text-xs text-gray-500">View your active inventory ({sellerProductsList.length} total) or share your full catalog link on social media.</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* View Mode Switcher Toggle */}
+                      <div className="flex items-center bg-gray-100 p-0.5 rounded border border-gray-200">
+                        <button
+                          type="button"
+                          onClick={() => setProductViewMode('table')}
+                          className={`px-3 py-1.5 text-xs font-semibold rounded flex items-center gap-1.5 transition-all cursor-pointer ${
+                            productViewMode === 'table'
+                              ? 'bg-white text-gold-dark shadow-xs font-bold'
+                              : 'text-gray-600 hover:text-charcoal'
+                          }`}
+                          title="Switch to Table View"
+                        >
+                          <List size={15} /> Table View
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setProductViewMode('grid')}
+                          className={`px-3 py-1.5 text-xs font-semibold rounded flex items-center gap-1.5 transition-all cursor-pointer ${
+                            productViewMode === 'grid'
+                              ? 'bg-white text-gold-dark shadow-xs font-bold'
+                              : 'text-gray-600 hover:text-charcoal'
+                          }`}
+                          title="Switch to Grid View"
+                        >
+                          <Grid size={15} /> Grid View
+                        </button>
+                      </div>
+
                       <button
-                        type="button"
-                        onClick={() => setProductViewMode('table')}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded flex items-center gap-1.5 transition-all cursor-pointer ${
-                          productViewMode === 'table'
-                            ? 'bg-white text-gold-dark shadow-xs font-bold'
-                            : 'text-gray-600 hover:text-charcoal'
-                        }`}
-                        title="Switch to Table View"
+                        onClick={() => handleOpenShareCatalog(null)}
+                        className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs px-3.5 py-2 rounded font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                        title="Share full catalog on WhatsApp, Instagram, Facebook"
                       >
-                        <List size={15} /> Table View
+                        <Share2 size={14} /> Share Catalog 📲
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setProductViewMode('grid')}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded flex items-center gap-1.5 transition-all cursor-pointer ${
-                          productViewMode === 'grid'
-                            ? 'bg-white text-gold-dark shadow-xs font-bold'
-                            : 'text-gray-600 hover:text-charcoal'
-                        }`}
-                        title="Switch to Grid View"
-                      >
-                        <Grid size={15} /> Grid View
+                      <button onClick={() => setActiveTab('add-product')} className="btn-gold py-2 px-4 text-xs cursor-pointer">
+                        <PlusCircle size={15} /> Add New Piece
                       </button>
                     </div>
-
-                    <button
-                      onClick={() => handleOpenShareCatalog(null)}
-                      className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs px-3.5 py-2 rounded font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                      title="Share full catalog on WhatsApp, Instagram, Facebook"
-                    >
-                      <Share2 size={14} /> Share Catalog 📲
-                    </button>
-                    <button onClick={() => setActiveTab('add-product')} className="btn-gold py-2 px-4 text-xs cursor-pointer">
-                      <PlusCircle size={15} /> Add New Piece
-                    </button>
                   </div>
-                </div>
 
-                {/* Table View */}
-                {productViewMode === 'table' ? (
-                  <div className="overflow-x-auto border border-gray-200 rounded-sm shadow-2xs">
-                    <table className="w-full text-left text-xs sm:text-sm border-collapse min-w-[750px]">
-                      <thead>
-                        <tr className="border-b border-gray-200 bg-[#FAF6F0] text-gray-700 font-semibold">
-                          <th className="p-3.5">Product</th>
-                          <th className="p-3.5">Category</th>
-                          <th className="p-3.5">SKU / Code</th>
-                          <th className="p-3.5">Price</th>
-                          <th className="p-3.5">Stock</th>
-                          <th className="p-3.5">Admin Status</th>
-                          <th className="p-3.5 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white">
-                        {sellerProductsList.length === 0 ? (
-                          <tr>
-                            <td colSpan="7" className="p-8 text-center text-gray-400">
-                              No jewellery products listed yet. Click "Add New Piece" to submit your first product!
-                            </td>
+                  {/* Product Search & Status Filter Bar */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-5 p-3 bg-[#FAF6F0]/60 border border-gray-200 rounded-sm">
+                    {/* Search Input Box */}
+                    <div className="relative w-full sm:w-80">
+                      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search by Product Name, Code/SKU, Metal..."
+                        value={productSearchQuery}
+                        onChange={(e) => {
+                          setProductSearchQuery(e.target.value);
+                          setProductCurrentPage(1);
+                        }}
+                        className="w-full pl-9 pr-8 py-2 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:border-gold shadow-2xs"
+                      />
+                      {productSearchQuery && (
+                        <button
+                          onClick={() => {
+                            setProductSearchQuery('');
+                            setProductCurrentPage(1);
+                          }}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-charcoal text-xs cursor-pointer"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Status Filter Tabs */}
+                    <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto no-scrollbar">
+                      {['All', 'Approved', 'Pending Approval', 'Rejected'].map((status) => {
+                        const count = sellerProductsList.filter(p => status === 'All' ? true : (p.approvalStatus || 'Approved') === status).length;
+                        return (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => {
+                              setProductStatusFilter(status);
+                              setProductCurrentPage(1);
+                            }}
+                            className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                              productStatusFilter === status
+                                ? 'bg-gold text-white font-semibold shadow-2xs'
+                                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                            }`}
+                          >
+                            {status} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Table View */}
+                  {productViewMode === 'table' ? (
+                    <div className="overflow-x-auto border border-gray-200 rounded-sm shadow-2xs">
+                      <table className="w-full text-left text-xs sm:text-sm border-collapse min-w-[750px] table-fixed">
+                        <thead>
+                          <tr className="border-b border-gray-200 bg-[#FAF6F0] text-gray-700 font-semibold">
+                            <th className="p-3.5 w-[32%]">Product</th>
+                            <th className="p-3.5 w-[14%]">Category</th>
+                            <th className="p-3.5 w-[14%]">SKU / Code</th>
+                            <th className="p-3.5 w-[12%]">Price</th>
+                            <th className="p-3.5 w-[10%]">Stock</th>
+                            <th className="p-3.5 w-[18%]">Admin Status</th>
+                            <th className="p-3.5 w-[12%] text-right">Actions</th>
                           </tr>
-                        ) : (
-                          sellerProductsList.map((p) => (
-                            <tr key={p.id || p._id} className="hover:bg-amber-50/20 transition-colors">
-                              <td className="p-3.5">
-                                <div className="flex items-center gap-3">
-                                  <div
-                                    className="relative group cursor-pointer shrink-0"
-                                    title="Click to enlarge image (Esc to close)"
-                                    onClick={() =>
-                                      setPreviewModal({
-                                        isOpen: true,
-                                        images: p.images && p.images.length > 0 ? p.images : [p.image || '/assets/jewellery/necklace/1.jpg'],
-                                        initialIndex: 0,
-                                        title: p.name
-                                      })
-                                    }
-                                  >
-                                    <img
-                                      src={p.images && p.images.length > 0 ? p.images[0] : (p.image || '/assets/jewellery/necklace/1.jpg')}
-                                      alt={p.name}
-                                      className="w-12 h-12 object-cover rounded-sm border border-gray-200 shadow-2xs group-hover:opacity-85 transition-opacity"
-                                    />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-sm">
-                                      <ZoomIn size={14} className="text-white drop-shadow" />
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <strong className="block text-charcoal font-medium text-sm">{p.name}</strong>
-                                    <span className="text-xs text-gray-400 capitalize">{p.metal || '22K Gold'}</span>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="p-3.5 capitalize text-gray-600 font-medium">
-                                {p.category || 'Jewellery'}
-                              </td>
-                              <td className="p-3.5 font-mono text-xs text-gray-500">
-                                {p.sku || p.id || 'RAT-JW-001'}
-                              </td>
-                              <td className="p-3.5 font-bold text-charcoal">
-                                ₹{p.price ? Number(p.price).toLocaleString('en-IN') : '0'}
-                              </td>
-                              <td className="p-3.5">
-                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${Number(p.stock) > 0 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
-                                  {p.stock !== undefined ? `${p.stock} in stock` : 'Available'}
-                                </span>
-                              </td>
-                              <td className="p-3.5">
-                                <div className="flex flex-col gap-1 max-w-[200px]">
-                                  <span className={`inline-block badge-status text-xs w-fit ${p.approvalStatus === 'Approved' ? 'badge-approved' : p.approvalStatus === 'Rejected' ? 'bg-rose-100 text-rose-800 border border-rose-200 font-bold' : 'badge-pending'}`}>
-                                    {p.approvalStatus || 'Approved'}
-                                  </span>
-                                  {p.approvalStatus === 'Rejected' && p.rejectionReason && (
-                                    <span className="text-[11px] text-red-600 italic line-clamp-2 bg-red-50 p-1 rounded border border-red-100" title={p.rejectionReason}>
-                                      "{p.rejectionReason}"
-                                    </span>
-                                  )}
-                                  {p.approvalStatus === 'Pending Approval' && p.rejectionReason && (
-                                    <span className="text-[11px] text-amber-700 italic line-clamp-2 bg-amber-50 p-1 rounded border border-amber-100" title={p.rejectionReason}>
-                                      Note: "{p.rejectionReason}"
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="p-3.5 text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenShareCatalog(p)}
-                                    className="px-2.5 py-1 text-xs text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 flex items-center gap-1 font-semibold transition-colors cursor-pointer"
-                                    title="Share product link"
-                                  >
-                                    <Share2 size={12} /> Share
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleEditClick(p)}
-                                    className="px-2.5 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-charcoal flex items-center gap-1 font-medium cursor-pointer transition-colors"
-                                    title="Edit product details"
-                                  >
-                                    <Edit size={13} /> Edit
-                                  </button>
-                                </div>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {filteredSellerProducts.length === 0 ? (
+                            <tr>
+                              <td colSpan="7" className="p-8 text-center text-gray-400">
+                                {productSearchQuery || productStatusFilter !== 'All'
+                                  ? 'No products found matching your search criteria.'
+                                  : 'No jewellery products listed yet. Click "Add New Piece" to submit your first product!'}
                               </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  /* Grid View */
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                    {sellerProductsList.map((p) => (
-                      <div key={p.id || p._id} className="border border-gray-200 rounded-sm p-3 flex flex-col justify-between">
-                        <div
-                          className="relative group cursor-pointer overflow-hidden rounded-sm mb-3"
-                          title="Click to view full image (Esc to close)"
-                          onClick={() =>
-                            setPreviewModal({
-                              isOpen: true,
-                              images: p.images && p.images.length > 0 ? p.images : [p.image || '/assets/jewellery/necklace/1.jpg'],
-                              initialIndex: 0,
-                              title: p.name
-                            })
-                          }
-                        >
-                          <img src={p.images ? p.images[0] : p.image} alt={p.name} className="w-full aspect-square object-cover rounded-sm group-hover:scale-105 transition-transform duration-300" />
-                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                            <span className="bg-black/70 text-white text-xs px-2.5 py-1 rounded flex items-center gap-1 font-medium shadow-md">
-                              <ZoomIn size={14} /> Full View
-                            </span>
+                          ) : (
+                            paginatedSellerProducts.map((p) => (
+                              <tr key={p.id || p._id} className="hover:bg-amber-50/20 transition-colors">
+                                <td className="p-3.5">
+                                  <div className="flex items-center gap-3 overflow-hidden">
+                                    <div
+                                      className="relative group cursor-pointer shrink-0"
+                                      title="Click to enlarge image (Esc to close)"
+                                      onClick={() =>
+                                        setPreviewModal({
+                                          isOpen: true,
+                                          images: p.images && p.images.length > 0 ? p.images : [p.image || '/assets/jewellery/necklace/1.jpg'],
+                                          initialIndex: 0,
+                                          title: p.name
+                                        })
+                                      }
+                                    >
+                                      <img
+                                        src={p.images && p.images.length > 0 ? p.images[0] : (p.image || '/assets/jewellery/necklace/1.jpg')}
+                                        alt={p.name}
+                                        className="w-12 h-12 object-cover rounded-sm border border-gray-200 shadow-2xs group-hover:opacity-85 transition-opacity shrink-0"
+                                      />
+                                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-sm">
+                                        <ZoomIn size={14} className="text-white drop-shadow" />
+                                      </div>
+                                    </div>
+                                    <div className="min-w-0 flex-1 overflow-hidden pr-2">
+                                      <strong className="block text-charcoal font-medium text-sm truncate whitespace-nowrap overflow-hidden text-ellipsis max-w-full" title={p.name}>
+                                        {p.name}
+                                      </strong>
+                                      <span className="text-xs text-gray-400 capitalize block truncate whitespace-nowrap">
+                                        {p.metal || '22K Gold'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="p-3.5 capitalize text-gray-600 font-medium truncate">
+                                  {p.category || 'Jewellery'}
+                                </td>
+                                <td className="p-3.5 font-mono text-xs text-gray-500 truncate">
+                                  {p.sku || p.id || 'RAT-JW-001'}
+                                </td>
+                                <td className="p-3.5 font-bold text-charcoal whitespace-nowrap">
+                                  ₹{p.price ? Number(p.price).toLocaleString('en-IN') : '0'}
+                                </td>
+                                <td className="p-3.5 whitespace-nowrap">
+                                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${Number(p.stock) > 0 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
+                                    {p.stock !== undefined ? `${p.stock} in stock` : 'Available'}
+                                  </span>
+                                </td>
+                                <td className="p-3.5">
+                                  <div className="flex flex-col gap-1 max-w-[200px]">
+                                    <span className={`inline-block badge-status text-xs w-fit ${p.approvalStatus === 'Approved' ? 'badge-approved' : p.approvalStatus === 'Rejected' ? 'bg-rose-100 text-rose-800 border border-rose-200 font-bold' : 'badge-pending'}`}>
+                                      {p.approvalStatus || 'Approved'}
+                                    </span>
+                                    {p.approvalStatus === 'Rejected' && p.rejectionReason && (
+                                      <span className="text-[11px] text-red-600 italic line-clamp-2 bg-red-50 p-1 rounded border border-red-100" title={p.rejectionReason}>
+                                        "{p.rejectionReason}"
+                                      </span>
+                                    )}
+                                    {p.approvalStatus === 'Pending Approval' && p.rejectionReason && (
+                                      <span className="text-[11px] text-amber-700 italic line-clamp-2 bg-amber-50 p-1 rounded border border-amber-100" title={p.rejectionReason}>
+                                        Note: "{p.rejectionReason}"
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-3.5 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenShareCatalog(p)}
+                                      className="p-2 text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 rounded-md border border-emerald-200 transition-colors cursor-pointer shrink-0 shadow-2xs"
+                                      title="Share product link"
+                                    >
+                                      <Share2 size={14} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEditClick(p)}
+                                      className="p-2 text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 rounded-md border border-amber-200 transition-colors cursor-pointer shrink-0 shadow-2xs"
+                                      title="Edit product details"
+                                    >
+                                      <Edit size={14} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteProduct(p)}
+                                      className="p-2 text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 rounded-md border border-rose-200 transition-colors cursor-pointer shrink-0 shadow-2xs"
+                                      title="Delete product"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    /* Grid View */
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                      {paginatedSellerProducts.map((p) => (
+                        <div key={p.id || p._id} className="border border-gray-200 rounded-sm p-3 flex flex-col justify-between">
+                          <div
+                            className="relative group cursor-pointer overflow-hidden rounded-sm mb-3"
+                            title="Click to view full image (Esc to close)"
+                            onClick={() =>
+                              setPreviewModal({
+                                isOpen: true,
+                                images: p.images && p.images.length > 0 ? p.images : [p.image || '/assets/jewellery/necklace/1.jpg'],
+                                initialIndex: 0,
+                                title: p.name
+                              })
+                            }
+                          >
+                            <img src={p.images ? p.images[0] : p.image} alt={p.name} className="w-full aspect-square object-cover rounded-sm group-hover:scale-105 transition-transform duration-300" />
+                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              <span className="bg-black/70 text-white text-xs px-2.5 py-1 rounded flex items-center gap-1 font-medium shadow-md">
+                                <ZoomIn size={14} /> Full View
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`badge-status text-xs ${p.approvalStatus === 'Approved' ? 'badge-approved' : p.approvalStatus === 'Rejected' ? 'bg-rose-100 text-rose-800 border border-rose-200 font-bold' : 'badge-pending'}`}>
+                                {p.approvalStatus || 'Approved'}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenShareCatalog(p)}
+                                  className="p-1.5 text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors cursor-pointer shadow-2xs"
+                                  title="Share product link"
+                                >
+                                  <Share2 size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditClick(p)}
+                                  className="p-1.5 text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 rounded border border-amber-200 transition-colors cursor-pointer shadow-2xs"
+                                  title="Edit product details"
+                                >
+                                  <Edit size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteProduct(p)}
+                                  className="p-1.5 text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 rounded border border-rose-200 transition-colors cursor-pointer shadow-2xs"
+                                  title="Delete product"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+                            <h4 className="text-sm font-medium text-charcoal mt-2 mb-1 truncate max-w-full" title={p.name}>{p.name}</h4>
+                            <div className="font-semibold text-sm">₹{p.price ? Number(p.price).toLocaleString('en-IN') : '0'}</div>
+
+                            {/* Rejection Details Box */}
+                            {p.approvalStatus === 'Rejected' && (
+                              <div className="mt-2.5 p-2.5 bg-red-50 border border-red-200 rounded text-xs text-red-900 space-y-1">
+                                <div className="flex items-center justify-between font-bold text-[0.72rem]">
+                                  <span className="flex items-center gap-1 text-red-700">
+                                    <AlertCircle size={13} /> Rejected by Admin
+                                  </span>
+                                  <span className="text-[0.65rem] text-gray-500 font-mono">
+                                    {p.rejectedAt ? new Date(p.rejectedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent'}
+                                  </span>
+                                </div>
+                                <div className="text-[0.72rem] text-red-800 italic bg-white/80 p-1.5 rounded border border-red-100">
+                                  "{p.rejectionReason || 'Please verify product details and resubmit.'}"
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Pending Re-approval Notice Box */}
+                            {p.approvalStatus === 'Pending Approval' && p.rejectionReason && (
+                              <div className="mt-2.5 p-2.5 bg-amber-50/90 border border-amber-200 rounded text-xs text-amber-900 space-y-1">
+                                <div className="flex items-center justify-between font-bold text-[0.72rem]">
+                                  <span className="flex items-center gap-1 text-amber-800">
+                                    <Clock size={13} /> Resubmitted for Re-approval
+                                  </span>
+                                  <span className="text-[0.65rem] text-gray-500 font-mono">
+                                    Rejected: {p.rejectedAt ? new Date(p.rejectedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent'}
+                                  </span>
+                                </div>
+                                <div className="text-[0.72rem] text-amber-800 italic bg-white/80 p-1.5 rounded border border-amber-100">
+                                  Previous Note: "{p.rejectionReason}"
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={`badge-status text-xs ${p.approvalStatus === 'Approved' ? 'badge-approved' : p.approvalStatus === 'Rejected' ? 'bg-rose-100 text-rose-800 border border-rose-200 font-bold' : 'badge-pending'}`}>
-                              {p.approvalStatus || 'Approved'}
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={() => handleOpenShareCatalog(p)}
-                                className="px-2 py-0.5 text-[0.72rem] text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 flex items-center gap-1 font-semibold transition-colors cursor-pointer"
-                                title="Share this product on WhatsApp / Social Media"
-                              >
-                                <Share2 size={12} /> Share 🔗
-                              </button>
-                              <button
-                                onClick={() => handleEditClick(p)}
-                                className="p-1 text-xs text-gray-500 hover:text-gold-dark flex items-center gap-1 font-medium"
-                                title="Edit Product & Resubmit"
-                              >
-                                <Edit size={14} /> Edit
-                              </button>
-                            </div>
-                          </div>
-                          <h4 className="text-sm font-medium text-charcoal mt-2 mb-1 line-clamp-1">{p.name}</h4>
-                          <div className="font-semibold text-sm">₹{p.price ? Number(p.price).toLocaleString('en-IN') : '0'}</div>
+                      ))}
+                    </div>
+                  )}
 
-                          {/* Rejection Details Box */}
-                          {p.approvalStatus === 'Rejected' && (
-                            <div className="mt-2.5 p-2.5 bg-red-50 border border-red-200 rounded text-xs text-red-900 space-y-1">
-                              <div className="flex items-center justify-between font-bold text-[0.72rem]">
-                                <span className="flex items-center gap-1 text-red-700">
-                                  <AlertCircle size={13} /> Rejected by Admin
-                                </span>
-                                <span className="text-[0.65rem] text-gray-500 font-mono">
-                                  {p.rejectedAt ? new Date(p.rejectedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent'}
-                                </span>
-                              </div>
-                              <div className="text-[0.72rem] text-red-800 italic bg-white/80 p-1.5 rounded border border-red-100">
-                                "{p.rejectionReason || 'Please verify product details and resubmit.'}"
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Pending Re-approval Notice Box */}
-                          {p.approvalStatus === 'Pending Approval' && p.rejectionReason && (
-                            <div className="mt-2.5 p-2.5 bg-amber-50/90 border border-amber-200 rounded text-xs text-amber-900 space-y-1">
-                              <div className="flex items-center justify-between font-bold text-[0.72rem]">
-                                <span className="flex items-center gap-1 text-amber-800">
-                                  <Clock size={13} /> Resubmitted for Re-approval
-                                </span>
-                                <span className="text-[0.65rem] text-gray-500 font-mono">
-                                  Rejected: {p.rejectedAt ? new Date(p.rejectedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent'}
-                                </span>
-                              </div>
-                              <div className="text-[0.72rem] text-amber-800 italic bg-white/80 p-1.5 rounded border border-amber-100">
-                                Previous Note: "{p.rejectionReason}"
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                  {/* Pagination Controls */}
+                  {filteredSellerProducts.length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-gray-100 text-xs sm:text-sm text-gray-600">
+                      <div>
+                        Showing <span className="font-semibold text-charcoal">{indexOfFirstProduct + 1}</span> to{' '}
+                        <span className="font-semibold text-charcoal">{Math.min(indexOfLastProduct, filteredSellerProducts.length)}</span> of{' '}
+                        <span className="font-semibold text-charcoal">{filteredSellerProducts.length}</span> products
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+
+                      {totalProductPages > 1 && (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setProductCurrentPage((prev) => Math.max(prev - 1, 1))}
+                            disabled={productCurrentPage === 1}
+                            className="px-3 py-1.5 rounded border border-gray-300 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors cursor-pointer"
+                          >
+                            Previous
+                          </button>
+
+                          {Array.from({ length: totalProductPages }, (_, i) => i + 1).map((pageNum) => (
+                            <button
+                              key={pageNum}
+                              type="button"
+                              onClick={() => setProductCurrentPage(pageNum)}
+                              className={`w-8 h-8 rounded text-xs font-semibold flex items-center justify-center transition-colors cursor-pointer ${
+                                productCurrentPage === pageNum
+                                  ? 'bg-gold text-white font-bold shadow-2xs'
+                                  : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          ))}
+
+                          <button
+                            type="button"
+                            onClick={() => setProductCurrentPage((prev) => Math.min(prev + 1, totalProductPages))}
+                            disabled={productCurrentPage === totalProductPages}
+                            className="px-3 py-1.5 rounded border border-gray-300 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors cursor-pointer"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ADD PRODUCT FORM TAB */}
             {activeTab === 'add-product' && (
